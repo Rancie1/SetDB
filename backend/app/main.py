@@ -8,6 +8,9 @@ FastAPI automatically generates API documentation at /docs when you run the serv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# Import all API routers
+from app.api import auth, users, sets, logs, reviews, ratings, lists
+
 # Create FastAPI app instance
 app = FastAPI(
     title="Deckd API",
@@ -24,6 +27,15 @@ app.add_middleware(
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
 )
+
+# Include all API routers
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(sets.router)
+app.include_router(logs.router)
+app.include_router(reviews.router)
+app.include_router(ratings.router)
+app.include_router(lists.router)
 
 @app.get("/")
 def read_root():
