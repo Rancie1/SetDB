@@ -104,7 +104,7 @@ class DJSet(Base):
     
     # Additional information
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)  # Platform-specific data
+    extra_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)  # Platform-specific data
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

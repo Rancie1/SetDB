@@ -107,7 +107,7 @@ async def import_set(
         description=set_data.get("description"),
         thumbnail_url=set_data.get("thumbnail_url"),
         duration_minutes=set_data.get("duration_minutes"),
-        metadata=set_data.get("metadata"),
+        extra_metadata=set_data.get("metadata"),
         created_by_id=user_id
     )
     

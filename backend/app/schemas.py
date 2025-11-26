@@ -103,7 +103,7 @@ class DJSetResponse(DJSetBase):
     event_name: Optional[str] = None
     event_date: Optional[date] = None
     venue_location: Optional[str] = None
-    metadata: Optional[dict] = None
+    extra_metadata: Optional[dict] = None
     created_at: datetime
     updated_at: datetime
     created_by_id: UUID
