@@ -7,7 +7,7 @@ from external sources (YouTube, SoundCloud).
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, delete
 from uuid import UUID
 from typing import Optional
 
@@ -97,8 +97,11 @@ async def get_sets(
     # Calculate pages
     pages = (total + limit - 1) // limit if total > 0 else 0
     
+    # Convert SQLAlchemy models to Pydantic schemas
+    set_responses = [DJSetResponse.model_validate(set_obj) for set_obj in sets]
+    
     return PaginatedResponse(
-        items=list(sets),
+        items=set_responses,
         total=total,
         page=page,
         limit=limit,
@@ -216,7 +219,8 @@ async def delete_set(
     if set_obj.created_by_id != current_user.id:
         raise ForbiddenError("Only the creator can delete this set")
     
-    await db.delete(set_obj)
+    # Delete the set
+    await db.execute(delete(DJSet).where(DJSet.id == set_id))
     await db.commit()
     
     return None
@@ -235,7 +239,8 @@ async def import_from_youtube(
     """
     try:
         imported_set = await import_set(import_request.url, current_user.id, db, source="youtube")
-        return imported_set
+        # Convert to response schema
+        return DJSetResponse.model_validate(imported_set)
     except Exception as e:
         raise ExternalAPIError(f"Failed to import from YouTube: {str(e)}")
 
@@ -253,7 +258,8 @@ async def import_from_soundcloud(
     """
     try:
         imported_set = await import_set(import_request.url, current_user.id, db, source="soundcloud")
-        return imported_set
+        # Convert to response schema
+        return DJSetResponse.model_validate(imported_set)
     except Exception as e:
         raise ExternalAPIError(f"Failed to import from SoundCloud: {str(e)}")
 

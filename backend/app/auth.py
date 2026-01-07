@@ -14,17 +14,13 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.models import User
 from app.core.exceptions import UnauthorizedError
-
-# Password hashing context
-# bcrypt is a secure password hashing algorithm
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # OAuth2 scheme for token extraction
 # This tells FastAPI to look for the token in the Authorization header
@@ -42,7 +38,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True if passwords match, False otherwise
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    # Convert string password to bytes if needed
+    if isinstance(plain_password, str):
+        plain_password = plain_password.encode('utf-8')
+    
+    # Convert hashed password to bytes if it's a string
+    if isinstance(hashed_password, str):
+        hashed_password = hashed_password.encode('utf-8')
+    
+    return bcrypt.checkpw(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
@@ -55,7 +59,16 @@ def get_password_hash(password: str) -> str:
     Returns:
         Hashed password string
     """
-    return pwd_context.hash(password)
+    # Convert password to bytes
+    if isinstance(password, str):
+        password = password.encode('utf-8')
+    
+    # Generate salt and hash password
+    salt = bcrypt.gensalt(rounds=12)
+    hashed = bcrypt.hashpw(password, salt)
+    
+    # Return as string
+    return hashed.decode('utf-8')
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
