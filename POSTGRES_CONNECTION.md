@@ -43,7 +43,7 @@ cat .env | grep DATABASE_URL
 
 The format is usually:
 ```
-postgresql://username:password@localhost:5432/database_name
+postgresql://nathanrancie@localhost:5432/deckd
 ```
 
 ## Common Connection Commands

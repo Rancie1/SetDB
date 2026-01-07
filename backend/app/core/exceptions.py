@@ -1,5 +1,5 @@
 """
-Custom exception classes for the Deckd application.
+Custom exception classes for the SetDB application.
 
 These exceptions can be raised in the application and handled by
 FastAPI's exception handlers to return appropriate HTTP responses.
@@ -9,7 +9,7 @@ from fastapi import HTTPException, status
 
 
 class DeckdException(HTTPException):
-    """Base exception class for Deckd-specific errors."""
+    """Base exception class for SetDB-specific errors."""
     pass
 
 

@@ -1,6 +1,6 @@
-# Deckd Backend
+# SetDB Backend
 
-FastAPI backend for the Deckd DJ sets tracking app.
+FastAPI backend for the SetDB DJ sets tracking app.
 
 ## Setup Instructions
 

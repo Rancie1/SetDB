@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Deckd frontend is a **Single Page Application (SPA)** built with React. It communicates with the FastAPI backend through REST API calls, manages state with Zustand, and uses React Router for navigation.
+The SetDB frontend is a **Single Page Application (SPA)** built with React. It communicates with the FastAPI backend through REST API calls, manages state with Zustand, and uses React Router for navigation.
 
 ## Technology Stack
 

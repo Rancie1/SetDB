@@ -1,5 +1,5 @@
 """
-Configuration settings for the Deckd application.
+Configuration settings for the SetDB application.
 
 Uses Pydantic Settings to manage environment variables with type validation.
 """

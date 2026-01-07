@@ -1,10 +1,10 @@
-# Deckd
+# SetDB
 
 A Letterboxd-style web application for tracking and discovering DJ sets.
 
-## What is Deckd?
+## What is SetDB?
 
-Deckd is a passion project born from my love of DJing and electronic music. Just like Letterboxd helps film lovers track and review movies, Deckd helps music enthusiasts track, rate, and review DJ sets.
+SetDB is a passion project born from my love of DJing and electronic music. Just like Letterboxd helps film lovers track and review movies, SetDB helps music enthusiasts track, rate, and review DJ sets.
 
 Whether you're discovering sets on YouTube, SoundCloud, or experiencing them live at festivals and clubs, Deckd lets you:
 - **Log sets** you've listened to or seen live
@@ -17,11 +17,11 @@ Whether you're discovering sets on YouTube, SoundCloud, or experiencing them liv
 ## Project Structure
 
 ```
-Deckd/
+SetDB/
 ├── backend/          # FastAPI backend (Python)
 │   ├── app/         # Application code
 │   └── README.md    # Backend setup instructions
-└── frontend/         # React frontend (coming soon)
+└── frontend/         # React frontend
 ```
 
 ## Tech Stack

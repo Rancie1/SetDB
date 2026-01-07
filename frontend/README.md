@@ -1,6 +1,6 @@
-# Deckd Frontend
+# SetDB Frontend
 
-React frontend for the Deckd DJ sets tracking application.
+React frontend for the SetDB DJ sets tracking application.
 
 ## Setup
 

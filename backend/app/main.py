@@ -13,7 +13,7 @@ from app.api import auth, users, sets, logs, reviews, ratings, lists
 
 # Create FastAPI app instance
 app = FastAPI(
-    title="Deckd API",
+    title="SetDB API",
     description="A Letterboxd-style app for DJ sets",
     version="1.0.0"
 )
@@ -40,7 +40,7 @@ app.include_router(lists.router)
 @app.get("/")
 def read_root():
     """Health check endpoint - confirms the API is running"""
-    return {"message": "Deckd API is running!"}
+    return {"message": "SetDB API is running!"}
 
 @app.get("/health")
 def health_check():

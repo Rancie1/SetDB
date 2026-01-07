@@ -8,19 +8,23 @@ To get full SoundCloud API access (for publish dates, duration, etc.), you need 
 
 1. **Go to SoundCloud Developers**: https://developers.soundcloud.com/
 2. **Sign in** with your SoundCloud account (or create one if needed)
-3. **Register a new application**:
-   - Go to "Your Apps" or "Register a new application"
-   - Fill in:
-     - **App Name**: "Deckd" (or whatever you want)
-     - **Website**: Your website URL (can be localhost for development)
-     - **Redirect URI**: `http://localhost:8000/api/auth/soundcloud/callback` (for OAuth, optional)
-   - Click "Register"
+3. **Request API Access**:
+   - SoundCloud requires you to email them for API access
+   - See `/SOUNDCLOUD_API_EMAIL_TEMPLATE.md` for email template
+   - Required information:
+     - **App Name**: SetDB
+     - **Description/Use Case**: DJ set tracking and cataloging platform
+     - **Redirect URI**: `http://localhost:8000/api/auth/soundcloud/callback`
+   
+   **Note:** You may need to register on their developer portal first, then email them with the above information.
 
 ## Step 2: Get Your Credentials
 
-After registering, you'll get:
+After emailing SoundCloud and getting approval, you'll receive:
 - **Client ID**: A public identifier for your app
-- **Client Secret**: A private key (keep this secret!)
+- **Client Secret**: A private key (if using OAuth - keep this secret!)
+
+**Note:** The approval process may take a few days. You can still use the app with oEmbed API (limited features) while waiting.
 
 ## Step 3: Add to Your .env File
 
