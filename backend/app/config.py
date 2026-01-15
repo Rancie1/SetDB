@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     # External APIs
     YOUTUBE_API_KEY: Optional[str] = None
     SOUNDCLOUD_CLIENT_ID: Optional[str] = None
+    SOUNDCLOUD_CLIENT_SECRET: Optional[str] = None
+    
+    # OAuth Redirect URLs
+    SOUNDCLOUD_REDIRECT_URI: Optional[str] = None  # e.g., "http://localhost:5173/auth/soundcloud/callback"
     
     class Config:
         env_file = ".env"

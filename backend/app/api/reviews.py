@@ -10,7 +10,7 @@ from sqlalchemy import select, func
 from uuid import UUID
 
 from app.database import get_db
-from app.models import Review, User, DJSet
+from app.models import Review, User, DJSet, Rating
 from app.schemas import ReviewCreate, ReviewUpdate, ReviewResponse, PaginatedResponse
 from app.auth import get_current_active_user
 from app.core.exceptions import DuplicateEntryError
@@ -61,7 +61,19 @@ async def create_review(
     # Load user relationship for response
     await db.refresh(new_review, ["user"])
     
-    return new_review
+    # Get the user's rating for this set
+    rating_result = await db.execute(
+        select(Rating).where(
+            Rating.user_id == current_user.id,
+            Rating.set_id == review_data.set_id
+        )
+    )
+    rating = rating_result.scalar_one_or_none()
+    
+    # Convert to response schema
+    review_dict = ReviewResponse.model_validate(new_review).model_dump()
+    review_dict['user_rating'] = rating.rating if rating else None
+    return ReviewResponse(**review_dict)
 
 
 @router.get("/{review_id}", response_model=ReviewResponse)
@@ -82,7 +94,19 @@ async def get_review(
     # Load user relationship
     await db.refresh(review, ["user"])
     
-    return review
+    # Get the user's rating for this set
+    rating_result = await db.execute(
+        select(Rating).where(
+            Rating.user_id == review.user_id,
+            Rating.set_id == review.set_id
+        )
+    )
+    rating = rating_result.scalar_one_or_none()
+    
+    # Convert to response schema
+    review_dict = ReviewResponse.model_validate(review).model_dump()
+    review_dict['user_rating'] = rating.rating if rating else None
+    return ReviewResponse(**review_dict)
 
 
 @router.get("/sets/{set_id}", response_model=PaginatedResponse)
@@ -122,15 +146,30 @@ async def get_set_reviews(
     result = await db.execute(query)
     reviews = result.scalars().all()
     
-    # Load user relationships
+    # Load user relationships and fetch ratings for each review
+    review_responses = []
     for review in reviews:
         await db.refresh(review, ["user"])
+        
+        # Get the user's rating for this set
+        rating_result = await db.execute(
+            select(Rating).where(
+                Rating.user_id == review.user_id,
+                Rating.set_id == set_id
+            )
+        )
+        rating = rating_result.scalar_one_or_none()
+        
+        # Convert to response schema
+        review_dict = ReviewResponse.model_validate(review).model_dump()
+        review_dict['user_rating'] = rating.rating if rating else None
+        review_responses.append(ReviewResponse(**review_dict))
     
     # Calculate pages
     pages = (total + limit - 1) // limit if total > 0 else 0
     
     return PaginatedResponse(
-        items=list(reviews),
+        items=review_responses,
         total=total,
         page=page,
         limit=limit,
@@ -174,7 +213,19 @@ async def update_review(
     await db.refresh(review)
     await db.refresh(review, ["user"])
     
-    return review
+    # Get the user's rating for this set
+    rating_result = await db.execute(
+        select(Rating).where(
+            Rating.user_id == review.user_id,
+            Rating.set_id == review.set_id
+        )
+    )
+    rating = rating_result.scalar_one_or_none()
+    
+    # Convert to response schema
+    review_dict = ReviewResponse.model_validate(review).model_dump()
+    review_dict['user_rating'] = rating.rating if rating else None
+    return ReviewResponse(**review_dict)
 
 
 @router.delete("/{review_id}", status_code=status.HTTP_204_NO_CONTENT)

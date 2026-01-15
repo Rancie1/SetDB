@@ -117,3 +117,72 @@ async def import_set(
     
     return new_set
 
+
+async def import_set_as_live(
+    url: str,
+    user_id: UUID,
+    db: AsyncSession,
+    source: Optional[str] = None
+) -> DJSet:
+    """
+    Import a DJ set from an external URL and create it as a live set.
+    
+    The imported URL is stored as recording_url, and the set is created
+    as source_type='live' so it appears on the discover page as a live set.
+    
+    Args:
+        url: URL of the set (YouTube, SoundCloud, etc.)
+        user_id: ID of the user importing the set
+        db: Database session
+        source: Optional platform override ('youtube' or 'soundcloud')
+        
+    Returns:
+        Created DJSet object (as live set)
+        
+    Raises:
+        Exception: If platform is unsupported or import fails
+    """
+    # Detect platform if not provided
+    if not source:
+        source = detect_platform(url)
+    
+    if not source:
+        raise Exception("Unsupported platform. Please provide a YouTube or SoundCloud URL.")
+    
+    # Import from the appropriate service to get metadata
+    if source == "youtube":
+        set_data = await import_from_youtube_url(url)
+    elif source == "soundcloud":
+        set_data = await import_from_soundcloud_url(url)
+    else:
+        raise Exception(f"Unsupported source: {source}")
+    
+    # Generate unique source_url for live set
+    from uuid import uuid4
+    unique_id = str(uuid4())[:8]
+    live_source_url = f"live://{set_data['dj_name']}-{set_data['title']}-{unique_id}"
+    
+    # Create live set with recording URL (NOT an event)
+    new_set = DJSet(
+        title=set_data["title"],
+        dj_name=set_data["dj_name"],
+        source_type=SourceType.LIVE,
+        source_id=None,  # Live sets don't have source_id
+        source_url=live_source_url,
+        description=set_data.get("description"),
+        thumbnail_url=set_data.get("thumbnail_url"),
+        duration_minutes=set_data.get("duration_minutes"),
+        recording_url=url,  # Store the YouTube/SoundCloud URL as recording
+        extra_metadata=set_data.get("metadata"),
+        is_event=False,  # This is a live set, not an event
+        created_by_id=user_id,
+        is_verified=False,  # Live sets don't need verification
+        confirmation_count=0
+    )
+    
+    db.add(new_set)
+    await db.commit()
+    await db.refresh(new_set)
+    
+    return new_set
+

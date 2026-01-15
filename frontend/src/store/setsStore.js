@@ -71,12 +71,17 @@ const useSetsStore = create((set, get) => ({
     }
   },
 
-  importSet: async (url) => {
+  importSet: async (url, markAsLive = false) => {
     set({ loading: true, error: null });
     try {
-      const response = await setsService.importSet(url);
-      // Refresh sets list after import
-      await get().fetchSets();
+      const response = await setsService.importSet(url, markAsLive);
+      // Refresh sets list after import (or events list if marked as live)
+      if (markAsLive) {
+        // If marked as live, it will appear in sets (since live sets appear on discover page)
+        await get().fetchSets();
+      } else {
+        await get().fetchSets();
+      }
       set({
         loading: false,
         error: null,

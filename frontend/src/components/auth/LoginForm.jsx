@@ -10,7 +10,7 @@ import { APP_NAME } from '../../utils/constants';
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const { login, loading, error, clearError } = useAuthStore();
+  const { login, loginWithSoundCloud, loading, error, clearError } = useAuthStore();
   const navigate = useNavigate();
   const { register, handleSubmit, formState: { errors } } = useForm();
 
@@ -80,6 +80,31 @@ const LoginForm = () => {
           {loading ? 'Logging in...' : 'Login'}
         </button>
       </form>
+
+      <div className="mt-6">
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-500">Or continue with</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => loginWithSoundCloud()}
+          disabled={loading}
+          className="mt-4 w-full flex items-center justify-center gap-2 bg-black hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <img 
+            src="/6862460f240ad9ae4680f211_cloudmark-white.png" 
+            alt="SoundCloud" 
+            className="w-5 h-5"
+          />
+          {loading ? 'Connecting...' : 'Login with SoundCloud'}
+        </button>
+      </div>
 
       <p className="mt-4 text-center text-sm text-gray-600">
         Don't have an account?{' '}

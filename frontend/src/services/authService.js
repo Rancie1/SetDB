@@ -31,4 +31,14 @@ export const updateProfile = async (userData) => {
   return api.put('/users/me', userData);
 };
 
+export const getSoundCloudAuthUrl = async () => {
+  return api.get('/auth/soundcloud/authorize');
+};
+
+export const soundCloudCallback = async (code, state) => {
+  return api.post('/auth/soundcloud/callback', null, {
+    params: { code, state },
+  });
+};
+
 

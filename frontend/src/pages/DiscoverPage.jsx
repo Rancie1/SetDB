@@ -30,14 +30,16 @@ const DiscoverPage = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Discover DJ Sets</h1>
+        <h1 className="text-3xl font-bold mb-2">Sets</h1>
         <p className="text-gray-600">
-          Browse and discover sets from YouTube, SoundCloud, and live events.
+          Browse and discover sets from YouTube and SoundCloud.
         </p>
       </div>
 
-      {/* Import Form */}
-      <SetImportForm onSuccess={handleImportSuccess} />
+      {/* Set Import Form */}
+      <div className="mb-6">
+        <SetImportForm onSuccess={handleImportSuccess} />
+      </div>
 
       {/* Search Bar */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">

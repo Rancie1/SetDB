@@ -126,6 +126,38 @@ async def delete_rating(
     return None
 
 
+@router.get("/sets/{set_id}/my-rating", response_model=RatingResponse)
+async def get_my_rating(
+    set_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get the current user's rating for a set."""
+    # Check if set exists
+    result = await db.execute(select(DJSet).where(DJSet.id == set_id))
+    set_obj = result.scalar_one_or_none()
+    
+    if not set_obj:
+        raise SetNotFoundError(str(set_id))
+    
+    # Get user's rating
+    rating_result = await db.execute(
+        select(Rating).where(
+            Rating.set_id == set_id,
+            Rating.user_id == current_user.id
+        )
+    )
+    rating = rating_result.scalar_one_or_none()
+    
+    if not rating:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="You haven't rated this set yet"
+        )
+    
+    return rating
+
+
 @router.get("/sets/{set_id}/stats", response_model=RatingStats)
 async def get_set_rating_stats(
     set_id: UUID,

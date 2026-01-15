@@ -23,14 +23,25 @@ const SetImportForm = ({ onSuccess }) => {
     handleSubmit,
     formState: { errors },
     reset,
-  } = useForm();
+    watch,
+  } = useForm({
+    defaultValues: {
+      mark_as_live: false,
+    },
+  });
+
+  const markAsLive = watch('mark_as_live');
 
   const onSubmit = async (data) => {
     setSuccessMessage(null);
     try {
-      const result = await importSet(data.url);
+      const result = await importSet(data.url, data.mark_as_live || false);
       if (result.success) {
-        setSuccessMessage('Set imported successfully!');
+        setSuccessMessage(
+          data.mark_as_live 
+            ? 'Live set created successfully! The recording URL has been saved.' 
+            : 'Set imported successfully!'
+        );
         reset();
         if (onSuccess) {
           onSuccess(result.data);
@@ -94,6 +105,24 @@ const SetImportForm = ({ onSuccess }) => {
           </div>
           <p className="mt-2 text-sm text-gray-500">
             Supported platforms: YouTube, SoundCloud
+          </p>
+        </div>
+
+        <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              {...register('mark_as_live')}
+              className="mr-2 h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+            />
+            <span className="text-sm text-gray-700">
+              Mark as live set
+            </span>
+          </label>
+          <p className="text-xs text-gray-500 mt-1 ml-6">
+            {markAsLive 
+              ? 'This will create a live set with the imported URL as the recording. The set will appear on the discover page as a live set.'
+              : 'If checked, creates a live set instead of a regular import. The URL will be stored as the recording.'}
           </p>
         </div>
 

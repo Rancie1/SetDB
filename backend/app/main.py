@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import all API routers
-from app.api import auth, users, sets, logs, reviews, ratings, lists
+from app.api import auth, users, sets, events, logs, reviews, ratings, lists
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -32,6 +32,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(sets.router)
+app.include_router(events.router)
 app.include_router(logs.router)
 app.include_router(reviews.router)
 app.include_router(ratings.router)

@@ -5,8 +5,10 @@ This module defines all database tables as SQLAlchemy models.
 Each model represents a table in the PostgreSQL database.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import List, Optional
+from typing import List as _List, Optional
 from uuid import uuid4
 
 from sqlalchemy import String, Text, Boolean, Integer, Float, Date, DateTime, ForeignKey, Enum, UniqueConstraint, CheckConstraint
@@ -39,7 +41,12 @@ class User(Base):
     # Authentication fields
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    hashed_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Nullable for OAuth users
+    
+    # OAuth fields
+    soundcloud_user_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    soundcloud_access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Encrypted in production
+    soundcloud_refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Profile fields
     display_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -52,23 +59,29 @@ class User(Base):
     
     # Relationships
     # These allow us to access related data easily (e.g., user.reviews)
-    reviews: Mapped[List["Review"]] = relationship("Review", back_populates="user", cascade="all, delete-orphan")
-    ratings: Mapped[List["Rating"]] = relationship("Rating", back_populates="user", cascade="all, delete-orphan")
-    logs: Mapped[List["UserSetLog"]] = relationship("UserSetLog", back_populates="user", cascade="all, delete-orphan")
-    created_sets: Mapped[List["DJSet"]] = relationship("DJSet", back_populates="created_by", foreign_keys="DJSet.created_by_id")
-    lists: Mapped[List["List"]] = relationship("List", back_populates="user", cascade="all, delete-orphan")
+    reviews: Mapped["_List[Review]"] = relationship("Review", back_populates="user", cascade="all, delete-orphan")
+    ratings: Mapped["_List[Rating]"] = relationship("Rating", back_populates="user", cascade="all, delete-orphan")
+    logs: Mapped["_List[UserSetLog]"] = relationship("UserSetLog", back_populates="user", cascade="all, delete-orphan")
+    created_sets: Mapped["_List[DJSet]"] = relationship("DJSet", back_populates="created_by", foreign_keys="DJSet.created_by_id")
+    created_events: Mapped["_List[Event]"] = relationship("Event", back_populates="created_by", foreign_keys="Event.created_by_id")
+    lists: Mapped["_List[List]"] = relationship("List", back_populates="user", cascade="all, delete-orphan")
     
     # Following relationships
-    following: Mapped[List["Follow"]] = relationship(
+    following: Mapped["_List[Follow]"] = relationship(
         "Follow",
         foreign_keys="Follow.follower_id",
         back_populates="follower",
         cascade="all, delete-orphan"
     )
-    followers: Mapped[List["Follow"]] = relationship(
+    followers: Mapped["_List[Follow]"] = relationship(
         "Follow",
         foreign_keys="Follow.following_id",
         back_populates="following",
+        cascade="all, delete-orphan"
+    )
+    event_confirmations: Mapped["_List[EventConfirmation]"] = relationship(
+        "EventConfirmation",
+        back_populates="user",
         cascade="all, delete-orphan"
     )
 
@@ -97,10 +110,9 @@ class DJSet(Base):
     thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     duration_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     
-    # Live event information (only for source_type='live')
-    event_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    event_date: Mapped[Optional[datetime]] = mapped_column(Date, nullable=True)
-    venue_location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # Recording URL for live sets (YouTube/SoundCloud recording if available)
+    # This stores the URL of the recording if the set was imported and marked as live
+    recording_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     
     # Additional information
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -115,10 +127,13 @@ class DJSet(Base):
     
     # Relationships
     created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id], back_populates="created_sets")
-    reviews: Mapped[List["Review"]] = relationship("Review", back_populates="set", cascade="all, delete-orphan")
-    ratings: Mapped[List["Rating"]] = relationship("Rating", back_populates="set", cascade="all, delete-orphan")
-    logs: Mapped[List["UserSetLog"]] = relationship("UserSetLog", back_populates="set", cascade="all, delete-orphan")
-    list_items: Mapped[List["ListItem"]] = relationship("ListItem", back_populates="set", cascade="all, delete-orphan")
+    reviews: Mapped["_List[Review]"] = relationship("Review", back_populates="set", cascade="all, delete-orphan")
+    ratings: Mapped["_List[Rating]"] = relationship("Rating", back_populates="set", cascade="all, delete-orphan")
+    logs: Mapped["_List[UserSetLog]"] = relationship("UserSetLog", back_populates="set", cascade="all, delete-orphan")
+    list_items: Mapped["_List[ListItem]"] = relationship("ListItem", back_populates="set", cascade="all, delete-orphan")
+    
+    # Relationships for events (many-to-many via EventSet table)
+    event_sets: Mapped["_List[EventSet]"] = relationship("EventSet", foreign_keys="EventSet.set_id", back_populates="set", cascade="all, delete-orphan")
     
     # Unique constraint: prevent duplicate sets from same source
     __table_args__ = (
@@ -248,7 +263,7 @@ class List(Base):
     
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="lists")
-    items: Mapped[List["ListItem"]] = relationship("ListItem", back_populates="list", cascade="all, delete-orphan", order_by="ListItem.position")
+    items: Mapped["_List[ListItem]"] = relationship("ListItem", back_populates="list", cascade="all, delete-orphan", order_by="ListItem.position")
 
 
 class ListItem(Base):
@@ -311,3 +326,99 @@ class Follow(Base):
     )
 
 
+class Event(Base):
+    """
+    Event model - stores live event information.
+    
+    Events are separate from sets. Users can attend events and confirm they happened.
+    Sets can be linked to events via the EventSet many-to-many table.
+    """
+    __tablename__ = "events"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Basic information
+    title: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    dj_name: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    
+    # Event information
+    event_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    event_date: Mapped[Optional[datetime]] = mapped_column(Date, nullable=True, index=True)
+    venue_location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    
+    # Media information
+    thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Verification fields
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    confirmation_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Foreign keys
+    created_by_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
+    # Relationships
+    created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id], back_populates="created_events")
+    linked_sets: Mapped["_List[EventSet]"] = relationship("EventSet", foreign_keys="EventSet.event_id", back_populates="event", cascade="all, delete-orphan")
+    confirmations: Mapped["_List[EventConfirmation]"] = relationship("EventConfirmation", back_populates="event", cascade="all, delete-orphan")
+
+
+class EventSet(Base):
+    """
+    EventSet model - many-to-many relationship between events and sets.
+    
+    Links sets to events. This is separate from recordings - sets can be
+    linked to events without being recordings of those events.
+    """
+    __tablename__ = "event_sets"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Foreign keys
+    event_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("events.id"), nullable=False, index=True)
+    set_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dj_sets.id"), nullable=False, index=True)
+    
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    event: Mapped["Event"] = relationship("Event", foreign_keys=[event_id], back_populates="linked_sets")
+    set: Mapped["DJSet"] = relationship("DJSet", foreign_keys=[set_id], back_populates="event_sets")
+    
+    # Unique constraint: prevent duplicate links
+    __table_args__ = (
+        UniqueConstraint('event_id', 'set_id', name='uq_event_set'),
+    )
+
+
+class EventConfirmation(Base):
+    """
+    Event Confirmation model - tracks which users confirmed a live event.
+    
+    Users can confirm that they attended a live event, which helps verify
+    that the event actually happened. After a threshold of confirmations,
+    the event can be auto-verified.
+    """
+    __tablename__ = "event_confirmations"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Foreign keys
+    user_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    event_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("events.id"), nullable=False, index=True)
+    
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="event_confirmations")
+    event: Mapped["Event"] = relationship("Event", back_populates="confirmations")
+    
+    # Unique constraint: user can only confirm an event once
+    __table_args__ = (
+        UniqueConstraint('user_id', 'event_id', name='uq_user_event_confirmation'),
+    )

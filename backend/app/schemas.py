@@ -80,6 +80,7 @@ class DJSetCreate(DJSetBase):
     event_name: Optional[str] = None
     event_date: Optional[date] = None
     venue_location: Optional[str] = None
+    recording_url: Optional[str] = Field(None, max_length=500)  # For live sets with recordings
 
 
 class DJSetUpdate(BaseSchema):
@@ -89,9 +90,7 @@ class DJSetUpdate(BaseSchema):
     description: Optional[str] = None
     thumbnail_url: Optional[str] = None
     duration_minutes: Optional[int] = Field(None, ge=0)
-    event_name: Optional[str] = None
-    event_date: Optional[date] = None
-    venue_location: Optional[str] = None
+    recording_url: Optional[str] = Field(None, max_length=500)
 
 
 class DJSetResponse(DJSetBase):
@@ -100,9 +99,7 @@ class DJSetResponse(DJSetBase):
     source_type: str
     source_id: Optional[str] = None
     source_url: str
-    event_name: Optional[str] = None
-    event_date: Optional[date] = None
-    venue_location: Optional[str] = None
+    recording_url: Optional[str] = None
     extra_metadata: Optional[dict] = None
     created_at: datetime
     updated_at: datetime
@@ -320,5 +317,52 @@ class PaginatedResponse(BaseModel):
 class ImportSetRequest(BaseSchema):
     """Schema for importing a set from external source."""
     url: str = Field(..., min_length=1, max_length=500)
+    mark_as_live: bool = Field(False, description="If True, create as a live set with the imported URL as recording_url")
 
 
+# ============================================================================
+# EVENT SCHEMAS
+# ============================================================================
+
+class EventBase(BaseSchema):
+    """Base event schema."""
+    title: str = Field(..., min_length=1, max_length=255)
+    dj_name: str = Field(..., min_length=1, max_length=255)
+    event_name: Optional[str] = Field(None, max_length=255)
+    event_date: Optional[date] = None
+    venue_location: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+
+
+class EventCreate(EventBase):
+    """Schema for creating an event."""
+    pass
+
+
+class EventUpdate(BaseSchema):
+    """Schema for updating an event."""
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    dj_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    event_name: Optional[str] = Field(None, max_length=255)
+    event_date: Optional[date] = None
+    venue_location: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+
+
+class EventResponse(EventBase):
+    """Schema for event response."""
+    id: UUID
+    is_verified: bool = False
+    confirmation_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+    created_by_id: UUID
+
+
+class CreateLiveEventFromSetRequest(BaseSchema):
+    """Schema for creating a live event from an existing set."""
+    event_name: Optional[str] = Field(None, max_length=255)
+    event_date: Optional[date] = None
+    venue_location: Optional[str] = Field(None, max_length=255)

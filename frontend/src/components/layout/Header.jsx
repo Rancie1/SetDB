@@ -30,7 +30,10 @@ const Header = () => {
               Home
             </Link>
             <Link to="/discover" className="text-gray-700 hover:text-primary-600 px-3 py-2">
-              Discover
+              Sets
+            </Link>
+            <Link to="/events" className="text-gray-700 hover:text-primary-600 px-3 py-2">
+              Events
             </Link>
             {isAuthenticated() && (
               <Link to="/feed" className="text-gray-700 hover:text-primary-600 px-3 py-2">

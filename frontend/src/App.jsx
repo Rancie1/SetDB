@@ -13,7 +13,11 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DiscoverPage from './pages/DiscoverPage';
+import EventsPage from './pages/EventsPage';
+import EventDetailsPage from './pages/EventDetailsPage';
 import UserProfilePage from './pages/UserProfilePage';
+import SoundCloudCallbackPage from './pages/SoundCloudCallbackPage';
+import SetDetailsPage from './pages/SetDetailsPage';
 
 function App() {
   const { checkAuth } = useAuthStore();
@@ -51,10 +55,26 @@ function App() {
           }
         />
         <Route
+          path="/auth/soundcloud/callback"
+          element={
+            <Layout>
+              <SoundCloudCallbackPage />
+            </Layout>
+          }
+        />
+        <Route
           path="/discover"
           element={
             <Layout>
               <DiscoverPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/events"
+          element={
+            <Layout>
+              <EventsPage />
             </Layout>
           }
         />
@@ -71,15 +91,19 @@ function App() {
             </ProtectedRoute>
           }
         />
-        {/* Placeholder routes for future pages */}
+        <Route
+          path="/events/:id"
+          element={
+            <Layout>
+              <EventDetailsPage />
+            </Layout>
+          }
+        />
         <Route
           path="/sets/:id"
           element={
             <Layout>
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <h1 className="text-3xl font-bold mb-6">Set Details</h1>
-                <p className="text-gray-600">Set detail page coming soon...</p>
-              </div>
+              <SetDetailsPage />
             </Layout>
           }
         />
