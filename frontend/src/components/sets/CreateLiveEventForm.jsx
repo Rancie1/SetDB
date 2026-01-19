@@ -35,7 +35,7 @@ const CreateLiveEventForm = ({ set, onSubmit, onCancel, loading }) => {
         Create Live Event
       </h3>
       <p className="text-sm text-purple-700 mb-4">
-        This will create a live event and link this set as a recording. 
+        This will create a live event. 
         You can add event details below (all optional).
       </p>
 

@@ -194,6 +194,8 @@ class ReviewResponse(BaseSchema):
     updated_at: datetime
     # Include user info for display
     user: Optional[UserResponse] = None
+    # Include the user's rating for this set (if they have one)
+    user_rating: Optional[float] = None
 
 
 # ============================================================================

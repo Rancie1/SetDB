@@ -38,7 +38,7 @@ const ReviewCard = ({ review, onDelete }) => {
             </div>
           )}
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Link
                 to={`/users/${review.user_id}`}
                 className="font-semibold text-gray-900 hover:text-primary-600"
@@ -46,8 +46,9 @@ const ReviewCard = ({ review, onDelete }) => {
                 {review.user?.username || 'Unknown User'}
               </Link>
               {review.user_rating && (
-                <span className="inline-flex items-center text-yellow-500 text-sm font-medium">
-                  ★ {review.user_rating.toFixed(1)}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-700 text-sm font-semibold">
+                  <span className="text-yellow-500">★</span>
+                  <span>{review.user_rating.toFixed(1)}</span>
                 </span>
               )}
             </div>
