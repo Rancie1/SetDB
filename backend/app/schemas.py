@@ -127,8 +127,12 @@ class LogResponse(BaseSchema):
     user_id: UUID
     set_id: UUID
     watched_date: date
+    is_top_set: Optional[bool] = False
+    top_set_order: Optional[int] = None
     is_reviewed: bool
     created_at: datetime
+    # Include set info for display (will be populated by API)
+    set: Optional[Any] = None
 
 
 # ============================================================================
@@ -196,6 +200,64 @@ class ReviewResponse(BaseSchema):
     user: Optional[UserResponse] = None
     # Include the user's rating for this set (if they have one)
     user_rating: Optional[float] = None
+
+
+# ============================================================================
+# TRACK TAG SCHEMAS
+# ============================================================================
+
+class SetTrackCreate(BaseSchema):
+    """Schema for creating a track tag."""
+    track_name: str = Field(..., min_length=1, max_length=255)
+    artist_name: Optional[str] = Field(None, max_length=255)
+    soundcloud_url: Optional[str] = Field(None, max_length=500)
+    position: Optional[int] = Field(None, ge=0)
+    timestamp_minutes: Optional[float] = Field(None, ge=0, description="Timestamp in minutes for sets with recordings")
+
+
+class SetTrackUpdate(BaseSchema):
+    """Schema for updating a track tag."""
+    track_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    artist_name: Optional[str] = Field(None, max_length=255)
+    soundcloud_url: Optional[str] = Field(None, max_length=500)
+    position: Optional[int] = Field(None, ge=0)
+    timestamp_minutes: Optional[float] = Field(None, ge=0, description="Timestamp in minutes for sets with recordings")
+
+
+class SetTrackResponse(BaseSchema):
+    """Schema for track tag response."""
+    id: UUID
+    set_id: UUID
+    added_by_id: UUID
+    track_name: str
+    artist_name: Optional[str] = None
+    soundcloud_url: Optional[str] = None
+    soundcloud_track_id: Optional[str] = None
+    position: Optional[int] = None
+    timestamp_minutes: Optional[float] = None
+    created_at: datetime
+    # Include user info for display
+    added_by: Optional[UserResponse] = None
+    # Confirmation stats
+    confirmation_count: Optional[int] = 0
+    denial_count: Optional[int] = 0
+    user_confirmation: Optional[bool] = None  # Current user's confirmation status
+
+
+class TrackConfirmationCreate(BaseSchema):
+    """Schema for creating a track confirmation."""
+    is_confirmed: bool = Field(..., description="True if track is correct, False if incorrect")
+
+
+class TrackConfirmationResponse(BaseSchema):
+    """Schema for track confirmation response."""
+    id: UUID
+    track_id: UUID
+    user_id: UUID
+    is_confirmed: bool
+    created_at: datetime
+    updated_at: datetime
+    user: Optional[UserResponse] = None
 
 
 # ============================================================================
@@ -332,6 +394,7 @@ class EventBase(BaseSchema):
     dj_name: str = Field(..., min_length=1, max_length=255)
     event_name: Optional[str] = Field(None, max_length=255)
     event_date: Optional[date] = None
+    duration_days: Optional[int] = Field(None, ge=1, description="Event length in days")
     venue_location: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = None
     thumbnail_url: Optional[str] = None
@@ -348,6 +411,7 @@ class EventUpdate(BaseSchema):
     dj_name: Optional[str] = Field(None, min_length=1, max_length=255)
     event_name: Optional[str] = Field(None, max_length=255)
     event_date: Optional[date] = None
+    duration_days: Optional[int] = Field(None, ge=1, description="Event length in days")
     venue_location: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = None
     thumbnail_url: Optional[str] = None

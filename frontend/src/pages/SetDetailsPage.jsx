@@ -16,11 +16,15 @@ import * as reviewsService from '../services/reviewsService';
 import * as ratingsService from '../services/ratingsService';
 import * as setsService from '../services/setsService';
 import * as eventsService from '../services/eventsService';
+import * as logsService from '../services/logsService';
 import ReviewCard from '../components/reviews/ReviewCard';
 import ReviewForm from '../components/reviews/ReviewForm';
 import RatingDisplay from '../components/reviews/RatingDisplay';
 import CreateLiveEventForm from '../components/sets/CreateLiveEventForm';
 import LinkToLiveEventForm from '../components/sets/LinkToLiveEventForm';
+import TrackTag from '../components/sets/TrackTag';
+import TrackTagForm from '../components/sets/TrackTagForm';
+import * as tracksService from '../services/tracksService';
 
 const SetDetailsPage = () => {
   const { id } = useParams();
@@ -41,6 +45,13 @@ const SetDetailsPage = () => {
   const [creatingLiveEvent, setCreatingLiveEvent] = useState(false);
   const [linkingToEvent, setLinkingToEvent] = useState(false);
   const [markingAsLive, setMarkingAsLive] = useState(false);
+  const [userLog, setUserLog] = useState(null);
+  const [loggingSet, setLoggingSet] = useState(false);
+  const [trackTags, setTrackTags] = useState([]);
+  const [trackTagsLoading, setTrackTagsLoading] = useState(false);
+  const [showTrackTagForm, setShowTrackTagForm] = useState(false);
+  const [settingTopSet, setSettingTopSet] = useState(false);
+  const [showTopSetSelector, setShowTopSetSelector] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -55,6 +66,8 @@ const SetDetailsPage = () => {
       loadReviews();
       loadRatingStats();
       loadUserRating();
+      loadUserLog();
+      loadTrackTags();
     }
   }, [currentSet, id, isAuthenticated]);
 
@@ -104,6 +117,163 @@ const SetDetailsPage = () => {
         console.error('Failed to load user rating:', err);
       }
       setUserRating(null);
+    }
+  };
+
+  const loadUserLog = async () => {
+    if (!isAuthenticated || !user) {
+      setUserLog(null);
+      return;
+    }
+    try {
+      // Get user's logs and check if this set is logged
+      const response = await logsService.getUserLogs(user.id, 1, 100);
+      const logs = response.data.items || [];
+      // Compare IDs as strings to handle UUID comparison
+      const logForThisSet = logs.find(log => String(log.set_id) === String(id));
+      setUserLog(logForThisSet || null);
+      // Close top set selector if log is removed
+      if (!logForThisSet) {
+        setShowTopSetSelector(false);
+      }
+    } catch (err) {
+      console.error('Failed to load user log:', err);
+      setUserLog(null);
+      setShowTopSetSelector(false);
+    }
+  };
+
+  const handleSetTopSet = async (order) => {
+    if (!userLog) {
+      alert('Please mark this set as seen first before adding it to your top sets.');
+      return;
+    }
+
+    setSettingTopSet(true);
+    try {
+      await logsService.setTopSet(userLog.id, order);
+      // Reload user log to get updated top set info
+      await loadUserLog();
+      setShowTopSetSelector(false);
+      // Optionally reload top sets on profile if user is viewing their own profile
+    } catch (error) {
+      console.error('Failed to set top set:', error);
+      alert(error.response?.data?.detail || 'Failed to add to top sets');
+    } finally {
+      setSettingTopSet(false);
+    }
+  };
+
+  const handleUnsetTopSet = async () => {
+    if (!userLog || !userLog.is_top_set) return;
+
+    setSettingTopSet(true);
+    try {
+      await logsService.unsetTopSet(userLog.id);
+      await loadUserLog();
+    } catch (error) {
+      console.error('Failed to unset top set:', error);
+      alert(error.response?.data?.detail || 'Failed to remove from top sets');
+    } finally {
+      setSettingTopSet(false);
+    }
+  };
+
+  const handleMarkAsSeen = async () => {
+    if (!isAuthenticated) {
+      alert('Please log in to mark sets');
+      return;
+    }
+
+    setLoggingSet(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const response = await logsService.logSet(id, today);
+      // Immediately update the state with the new log from the response
+      if (response && response.data) {
+        setUserLog(response.data);
+      } else {
+        // Fallback: reload if response structure is different
+        await loadUserLog();
+      }
+    } catch (err) {
+      console.error('Failed to mark set:', err);
+      const isLiveSet = currentSet?.source_type?.toLowerCase() === 'live';
+      const actionLabel = isLiveSet ? 'seen' : 'listened';
+      
+      if (err.response?.status === 409) {
+        // If already logged, reload to get the existing log
+        await loadUserLog();
+        alert(`You have already marked this set as ${actionLabel}`);
+      } else {
+        alert(err.response?.data?.detail || `Failed to mark set as ${actionLabel}`);
+      }
+    } finally {
+      setLoggingSet(false);
+    }
+  };
+
+  const handleRemoveFromSeen = async () => {
+    if (!userLog || !currentSet) return;
+
+    const isLiveSet = currentSet.source_type?.toLowerCase() === 'live';
+    const actionLabel = isLiveSet ? 'seen' : 'listened';
+    const confirmMessage = `Remove this set from your ${actionLabel} list?`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    setLoggingSet(true);
+    try {
+      await logsService.deleteLog(userLog.id);
+      // Immediately update the state
+      setUserLog(null);
+    } catch (err) {
+      console.error('Failed to remove log:', err);
+      const isLiveSet = currentSet?.source_type?.toLowerCase() === 'live';
+      const actionLabel = isLiveSet ? 'seen' : 'listened';
+      alert(err.response?.data?.detail || `Failed to remove from ${actionLabel} list`);
+    } finally {
+      setLoggingSet(false);
+    }
+  };
+
+  const loadTrackTags = async () => {
+    setTrackTagsLoading(true);
+    try {
+      const response = await tracksService.getSetTracks(id);
+      setTrackTags(response.data || []);
+    } catch (error) {
+      console.error('Failed to load track tags:', error);
+      setTrackTags([]);
+    } finally {
+      setTrackTagsLoading(false);
+    }
+  };
+
+  const handleTrackTagAdded = () => {
+    setShowTrackTagForm(false);
+    loadTrackTags();
+  };
+
+  const handleRemoveTrackTag = async (trackId) => {
+    if (!confirm('Remove this track tag?')) {
+      return;
+    }
+
+    try {
+      await tracksService.removeTrackTag(id, trackId);
+      // Optimistically remove from UI immediately
+      setTrackTags(prev => prev.filter(track => track.id !== trackId));
+      // Then reload to ensure consistency
+      await loadTrackTags();
+    } catch (error) {
+      console.error('Failed to remove track tag:', error);
+      console.error('Error response:', error.response);
+      // Reload on error to restore state
+      await loadTrackTags();
+      alert(error.response?.data?.detail || 'Failed to remove track tag');
     }
   };
 
@@ -503,6 +673,96 @@ const SetDetailsPage = () => {
                 </a>
               )}
               
+              {/* Mark as Seen/Listened button - works for all sets */}
+              {isAuthenticated && (
+                <div className="space-y-3">
+                  {(() => {
+                    const isLiveSet = currentSet.source_type?.toLowerCase() === 'live';
+                    const actionLabel = isLiveSet ? 'Seen' : 'Listened';
+                    const actionIcon = isLiveSet ? '👁️' : '🎧';
+                    
+                    return userLog ? (
+                      <div className="space-y-2">
+                        <button
+                          onClick={handleRemoveFromSeen}
+                          disabled={loggingSet}
+                          className="inline-flex items-center px-4 py-2 bg-green-100 hover:bg-green-200 text-green-800 font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loggingSet ? 'Removing...' : `✓ Marked as ${actionLabel}`}
+                        </button>
+                        
+                        {/* Top Set Management */}
+                        <div className="flex items-center space-x-4">
+                          {userLog.is_top_set ? (
+                            <>
+                              <span className="text-primary-600 font-medium text-sm">
+                                ⭐ In Top Sets (#{userLog.top_set_order})
+                              </span>
+                              <button
+                                onClick={handleUnsetTopSet}
+                                disabled={settingTopSet}
+                                className="text-sm text-gray-600 hover:text-gray-800 underline disabled:opacity-50"
+                              >
+                                Remove
+                              </button>
+                              <button
+                                onClick={() => setShowTopSetSelector(!showTopSetSelector)}
+                                disabled={settingTopSet}
+                                className="text-sm text-primary-600 hover:text-primary-700 underline disabled:opacity-50"
+                              >
+                                Change Position
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setShowTopSetSelector(!showTopSetSelector)}
+                              disabled={settingTopSet}
+                              className="text-sm text-primary-600 hover:text-primary-700 underline disabled:opacity-50"
+                            >
+                              ⭐ Add to Top Sets
+                            </button>
+                          )}
+                          
+                          {showTopSetSelector && (
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-gray-600">Position:</span>
+                              {[1, 2, 3, 4, 5].map((order) => (
+                                <button
+                                  key={order}
+                                  onClick={() => handleSetTopSet(order)}
+                                  disabled={settingTopSet}
+                                  className={`px-3 py-1 text-sm rounded-md font-medium disabled:opacity-50 ${
+                                    userLog.is_top_set && userLog.top_set_order === order
+                                      ? 'bg-primary-600 text-white'
+                                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                  }`}
+                                >
+                                  {order}
+                                </button>
+                              ))}
+                              <button
+                                onClick={() => setShowTopSetSelector(false)}
+                                className="text-sm text-gray-600 hover:text-gray-800 underline"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleMarkAsSeen}
+                        disabled={loggingSet}
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loggingSet ? 'Marking...' : `${actionIcon} Mark as ${actionLabel}`}
+                      </button>
+                    );
+                  })()}
+                </div>
+              )}
+              
               {isAuthenticated && (
                 <button
                   onClick={() => setShowReviewForm(!showReviewForm)}
@@ -537,6 +797,62 @@ const SetDetailsPage = () => {
               onCancel={() => setShowReviewForm(false)}
             />
           )}
+
+          {/* Track Tags Section */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Track Tags</h2>
+              {isAuthenticated && (
+                <button
+                  onClick={() => setShowTrackTagForm(!showTrackTagForm)}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md text-sm"
+                >
+                  {showTrackTagForm ? 'Cancel' : '+ Add Track'}
+                </button>
+              )}
+            </div>
+
+            {showTrackTagForm && (
+              <div className="mb-6">
+                <TrackTagForm
+                  setId={id}
+                  onSubmit={handleTrackTagAdded}
+                  onCancel={() => setShowTrackTagForm(false)}
+                  setHasRecording={!!currentSet?.recording_url}
+                />
+              </div>
+            )}
+
+            {trackTagsLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-16"></div>
+                ))}
+              </div>
+            ) : trackTags.length === 0 ? (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                <p className="text-gray-600 mb-2">No track tags yet</p>
+                <p className="text-gray-400 text-sm">
+                  {isAuthenticated
+                    ? 'Add tracks that were played in this set'
+                    : 'Log in to add track tags'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {trackTags.map((track) => (
+                  <TrackTag
+                    key={`${track.id}-${String(track.user_confirmation)}-${track.confirmation_count}-${track.denial_count}`}
+                    track={track}
+                    onDelete={handleRemoveTrackTag}
+                    canDelete={isAuthenticated && String(user?.id) === String(track.added_by_id)}
+                    onConfirmationChange={loadTrackTags}
+                    setHasRecording={!!currentSet?.recording_url}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Reviews Section */}
           <div>

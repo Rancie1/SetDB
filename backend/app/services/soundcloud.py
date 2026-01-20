@@ -158,6 +158,18 @@ async def fetch_soundcloud_track_info_api(url: str) -> Optional[Dict]:
             title = data.get("title", "")
             description = data.get("description", "")
             
+            # Get user/DJ name first (needed to clean title)
+            user = data.get("user", {})
+            dj_name = user.get("full_name") or user.get("username", "Unknown Artist")
+            
+            # Remove " by Artist Name" from title if present
+            # SoundCloud titles often include "Track Name by Artist Name"
+            if " by " in title:
+                # Split on " by " and take the first part (the track name)
+                parts = title.split(" by ", 1)
+                if len(parts) > 1:
+                    title = parts[0].strip()
+            
             # Get thumbnail URL from oEmbed for better quality (oEmbed returns higher quality images)
             # We'll use API for metadata but oEmbed for thumbnail
             thumbnail_url = None
@@ -198,10 +210,6 @@ async def fetch_soundcloud_track_info_api(url: str) -> Optional[Dict]:
                         thumbnail_url = re.sub(r'-[a-z]\d+x\d+\.(jpg|png)$', r'-original.\1', artwork_url)
                         if thumbnail_url == artwork_url:
                             thumbnail_url = re.sub(r'\.(jpg|png)$', r'-original.\1', artwork_url)
-            
-            # Get user/DJ name
-            user = data.get("user", {})
-            dj_name = user.get("full_name") or user.get("username", "Unknown Artist")
             
             # Get duration (in milliseconds, convert to minutes)
             duration_ms = data.get("duration", 0)
@@ -261,6 +269,16 @@ async def fetch_soundcloud_track_info_api(url: str) -> Optional[Dict]:
                             title = data.get("title", "")
                             description = data.get("description", "")
                             
+                            # Get user/DJ name first (needed to clean title)
+                            user = data.get("user", {})
+                            dj_name = user.get("full_name") or user.get("username", "Unknown Artist")
+                            
+                            # Remove " by Artist Name" from title if present
+                            if " by " in title:
+                                parts = title.split(" by ", 1)
+                                if len(parts) > 1:
+                                    title = parts[0].strip()
+                            
                             # Get thumbnail URL from oEmbed for better quality
                             thumbnail_url = None
                             try:
@@ -291,8 +309,6 @@ async def fetch_soundcloud_track_info_api(url: str) -> Optional[Dict]:
                                         thumbnail_url = re.sub(r'-[a-z]\d+x\d+\.(jpg|png)$', r'-original.\1', artwork_url)
                                         if thumbnail_url == artwork_url:
                                             thumbnail_url = re.sub(r'\.(jpg|png)$', r'-original.\1', artwork_url)
-                            user = data.get("user", {})
-                            dj_name = user.get("full_name") or user.get("username", "Unknown Artist")
                             duration_ms = data.get("duration", 0)
                             duration_minutes = int(duration_ms / 1000 / 60) if duration_ms else None
                             created_at = data.get("created_at")
@@ -400,9 +416,11 @@ async def fetch_soundcloud_track_info(url: str) -> Dict:
             # SoundCloud titles are often "Track Name by Artist Name"
             dj_name = "Unknown Artist"
             if " by " in title:
-                parts = title.split(" by ")
+                parts = title.split(" by ", 1)
                 if len(parts) > 1:
                     dj_name = parts[-1].strip()
+                    # Remove " by Artist Name" from title
+                    title = parts[0].strip()
             elif description:
                 # Try to extract from description
                 by_match = re.search(r'by\s+([^\n]+)', description, re.IGNORECASE)

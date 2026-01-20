@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import List as _List, Optional
 from uuid import uuid4
 
-from sqlalchemy import String, Text, Boolean, Integer, Float, Date, DateTime, ForeignKey, Enum, UniqueConstraint, CheckConstraint
+from sqlalchemy import String, Text, Boolean, Integer, Float, Date, DateTime, ForeignKey, Enum, UniqueConstraint, CheckConstraint, Numeric
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -135,9 +135,86 @@ class DJSet(Base):
     # Relationships for events (many-to-many via EventSet table)
     event_sets: Mapped["_List[EventSet]"] = relationship("EventSet", foreign_keys="EventSet.set_id", back_populates="set", cascade="all, delete-orphan")
     
+    # Relationships for track tags
+    track_tags: Mapped["_List[SetTrack]"] = relationship("SetTrack", back_populates="set", cascade="all, delete-orphan")
+    
     # Unique constraint: prevent duplicate sets from same source
     __table_args__ = (
         UniqueConstraint('source_type', 'source_id', name='uq_set_source'),
+    )
+
+
+class SetTrack(Base):
+    """
+    Set Track model - tracks individual songs/tracks played in a set.
+    
+    Users can tag tracks that were played in a set. If the track is available
+    on SoundCloud, a link is provided to access it.
+    """
+    __tablename__ = "set_tracks"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Foreign keys
+    set_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dj_sets.id"), nullable=False, index=True)
+    added_by_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Track information
+    track_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    artist_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    
+    # SoundCloud link (if available)
+    soundcloud_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    soundcloud_track_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    
+    # Position in set (optional - for ordering tracks)
+    position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    
+    # Timestamp in recording (in minutes) - for sets with recordings
+    timestamp_minutes: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    set: Mapped["DJSet"] = relationship("DJSet", back_populates="track_tags")
+    added_by: Mapped["User"] = relationship("User", foreign_keys=[added_by_id])
+    confirmations: Mapped["_List[TrackConfirmation]"] = relationship("TrackConfirmation", back_populates="track", cascade="all, delete-orphan")
+    
+    # Unique constraint: prevent duplicate track tags for same set
+    __table_args__ = (
+        UniqueConstraint('set_id', 'track_name', 'artist_name', name='uq_set_track'),
+    )
+
+
+class TrackConfirmation(Base):
+    """
+    Track Confirmation model - allows users to confirm or deny if a track tag is correct.
+    
+    Users can vote on whether a track tag accurately represents what was played in the set.
+    """
+    __tablename__ = "track_confirmations"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Foreign keys
+    track_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("set_tracks.id"), nullable=False, index=True)
+    user_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Confirmation status: True = confirmed (correct), False = denied (incorrect)
+    is_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    track: Mapped["SetTrack"] = relationship("SetTrack", back_populates="confirmations")
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    
+    # Unique constraint: user can only confirm/deny a track once
+    __table_args__ = (
+        UniqueConstraint('user_id', 'track_id', name='uq_user_track_confirmation'),
     )
 
 
@@ -159,6 +236,10 @@ class UserSetLog(Base):
     # Log information
     watched_date: Mapped[datetime] = mapped_column(Date, nullable=False)
     is_reviewed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+    # Top sets feature - users can mark sets as their top 5
+    is_top_set: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    top_set_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 1-5 for ordering top sets
     
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
@@ -344,6 +425,7 @@ class Event(Base):
     # Event information
     event_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     event_date: Mapped[Optional[datetime]] = mapped_column(Date, nullable=True, index=True)
+    duration_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     venue_location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     
     # Media information

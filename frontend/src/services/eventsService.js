@@ -54,3 +54,9 @@ export const unconfirmEvent = async (eventId) => {
 export const createEventFromSet = async (setId, eventData = {}) => {
   return api.post(`/events/create-from-set/${setId}`, eventData);
 };
+
+export const getUserConfirmedEvents = async (userId, page = 1, limit = 20) => {
+  return api.get(`/events/users/${userId}/confirmed`, {
+    params: { page, limit },
+  });
+};

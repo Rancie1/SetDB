@@ -41,7 +41,7 @@ const UserStats = ({ stats, loading }) => {
       icon: '⭐',
     },
     {
-      label: 'Following',
+      label: 'Friends',
       value: stats.following_count || 0,
       icon: '👥',
     },

@@ -134,6 +134,7 @@ async def create_event(
         dj_name=event_data.dj_name,
         event_name=event_data.event_name,
         event_date=event_data.event_date,
+        duration_days=event_data.duration_days,
         venue_location=event_data.venue_location,
         description=event_data.description,
         thumbnail_url=event_data.thumbnail_url,
@@ -176,6 +177,8 @@ async def update_event(
         event_obj.event_name = event_update.event_name
     if event_update.event_date is not None:
         event_obj.event_date = event_update.event_date
+    if event_update.duration_days is not None:
+        event_obj.duration_days = event_update.duration_days
     if event_update.venue_location is not None:
         event_obj.venue_location = event_update.venue_location
     if event_update.description is not None:
@@ -454,6 +457,64 @@ async def unconfirm_event(
     await db.flush()
     
     return None
+
+
+@router.get("/users/{user_id}/confirmed", response_model=PaginatedResponse)
+async def get_user_confirmed_events(
+    user_id: UUID,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get paginated list of events confirmed by a user.
+    
+    Returns all events that the user has confirmed/attended.
+    """
+    # Check if user exists
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found"
+        )
+    
+    # Build query - get events via EventConfirmation
+    query = (
+        select(Event)
+        .join(EventConfirmation, Event.id == EventConfirmation.event_id)
+        .where(EventConfirmation.user_id == user_id)
+        .order_by(Event.event_date.desc().nulls_last(), Event.created_at.desc())
+    )
+    
+    # Get total count
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+    
+    # Apply pagination
+    offset = (page - 1) * limit
+    query = query.offset(offset).limit(limit)
+    
+    # Execute query
+    result = await db.execute(query)
+    events = result.scalars().all()
+    
+    # Calculate pages
+    pages = (total + limit - 1) // limit if total > 0 else 0
+    
+    # Convert to response schemas
+    event_responses = [EventResponse.model_validate(event) for event in events]
+    
+    return PaginatedResponse(
+        items=event_responses,
+        total=total,
+        page=page,
+        limit=limit,
+        pages=pages
+    )
 
 
 @router.post("/create-from-set/{set_id}", response_model=EventResponse, status_code=status.HTTP_201_CREATED)

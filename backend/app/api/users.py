@@ -6,24 +6,135 @@ Handles user profiles, statistics, and following functionality.
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from uuid import UUID
+from typing import Optional
 
 from app.database import get_db
 from app.models import User, Follow, UserSetLog, Review, List, Rating
 from app.schemas import UserResponse, UserUpdate, UserStats, PaginatedResponse
 from app.auth import get_current_active_user
+from fastapi import Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
+from app.config import settings
 from app.core.exceptions import ForbiddenError, DuplicateEntryError
 
 router = APIRouter(prefix="/api/users", tags=["users"])
+
+security = HTTPBearer(auto_error=False)
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """Optional dependency to get current user if authenticated."""
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(
+            credentials.credentials, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
+        )
+        user_id: Optional[str] = payload.get("sub")
+        if user_id is None:
+            return None
+        result = await db.execute(select(User).where(User.id == UUID(user_id)))
+        user = result.scalar_one_or_none()
+        return user
+    except:
+        return None
+
+
+@router.get("", response_model=PaginatedResponse)
+async def search_users(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None, min_length=1),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Search for users by username or display name.
+    
+    Query parameters:
+    - page: Page number (starts at 1)
+    - limit: Items per page (1-100)
+    - search: Search query (searches username and display_name)
+    """
+    query = select(User)
+    
+    # Apply search filter
+    if search:
+        query = query.where(
+            or_(
+                User.username.ilike(f"%{search}%"),
+                User.display_name.ilike(f"%{search}%")
+            )
+        )
+    
+    # Order by username
+    query = query.order_by(User.username)
+    
+    # Get total count
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+    
+    # Apply pagination
+    offset = (page - 1) * limit
+    query = query.offset(offset).limit(limit)
+    
+    # Execute query
+    result = await db.execute(query)
+    users = result.scalars().all()
+    
+    # Calculate pages
+    pages = (total + limit - 1) // limit if total > 0 else 0
+    
+    # Convert to response schemas
+    user_responses = [UserResponse.model_validate(user) for user in users]
+    
+    return PaginatedResponse(
+        items=user_responses,
+        total=total,
+        page=page,
+        limit=limit,
+        pages=pages
+    )
+
+
+@router.get("/{user_id}/follow-status")
+async def get_follow_status(
+    user_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Check if current user is following the specified user."""
+    if user_id == current_user.id:
+        return {"is_following": False, "is_own_profile": True}
+    
+    result = await db.execute(
+        select(Follow).where(
+            Follow.follower_id == current_user.id,
+            Follow.following_id == user_id
+        )
+    )
+    follow = result.scalar_one_or_none()
+    
+    return {"is_following": follow is not None, "is_own_profile": False}
 
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: UUID,
+    current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get user profile by ID."""
+    """
+    Get user profile by ID.
+    
+    Optionally authenticated - returns user profile whether authenticated or not.
+    """
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     
@@ -190,6 +301,61 @@ async def unfollow_user(
     await db.commit()
     
     return None
+
+
+@router.get("/me/friends", response_model=PaginatedResponse)
+async def get_my_friends(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get list of users that the current user is following (friends).
+    
+    Returns paginated list of friends with their user information.
+    """
+    # Get list of followed user IDs
+    following_result = await db.execute(
+        select(Follow.following_id).where(Follow.follower_id == current_user.id)
+    )
+    following_ids = [row[0] for row in following_result.all()]
+    
+    if not following_ids:
+        return PaginatedResponse(
+            items=[],
+            total=0,
+            page=page,
+            limit=limit,
+            pages=0
+        )
+    
+    # Get total count
+    total = len(following_ids)
+    
+    # Apply pagination
+    offset = (page - 1) * limit
+    paginated_ids = following_ids[offset:offset + limit]
+    
+    # Get user objects
+    users_result = await db.execute(
+        select(User).where(User.id.in_(paginated_ids))
+    )
+    users = users_result.scalars().all()
+    
+    # Calculate pages
+    pages = (total + limit - 1) // limit if total > 0 else 0
+    
+    # Convert to response schemas
+    user_responses = [UserResponse.model_validate(user) for user in users]
+    
+    return PaginatedResponse(
+        items=user_responses,
+        total=total,
+        page=page,
+        limit=limit,
+        pages=pages
+    )
 
 
 @router.get("/me/feed", response_model=PaginatedResponse)

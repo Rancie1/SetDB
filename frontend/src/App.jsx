@@ -15,7 +15,11 @@ import RegisterPage from './pages/RegisterPage';
 import DiscoverPage from './pages/DiscoverPage';
 import EventsPage from './pages/EventsPage';
 import EventDetailsPage from './pages/EventDetailsPage';
+import CreateEventPage from './pages/CreateEventPage';
 import UserProfilePage from './pages/UserProfilePage';
+import SearchUsersPage from './pages/SearchUsersPage';
+import FriendsPage from './pages/FriendsPage';
+import ManageProfilePage from './pages/ManageProfilePage';
 import SoundCloudCallbackPage from './pages/SoundCloudCallbackPage';
 import SetDetailsPage from './pages/SetDetailsPage';
 
@@ -79,6 +83,16 @@ function App() {
           }
         />
         <Route
+          path="/events/create"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <CreateEventPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/feed"
           element={
             <ProtectedRoute>
@@ -108,11 +122,37 @@ function App() {
           }
         />
         <Route
+          path="/friends"
+          element={
+            <Layout>
+              <FriendsPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/friends/search"
+          element={
+            <Layout>
+              <SearchUsersPage />
+            </Layout>
+          }
+        />
+        <Route
           path="/users/:id"
           element={
             <Layout>
               <UserProfilePage />
             </Layout>
+          }
+        />
+        <Route
+          path="/profile/manage"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ManageProfilePage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
       </Routes>

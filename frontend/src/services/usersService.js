@@ -38,4 +38,20 @@ export const getUserLogs = async (userId, page = 1, limit = 20) => {
   });
 };
 
+export const searchUsers = async (searchQuery, page = 1, limit = 20) => {
+  return api.get('/users', {
+    params: { search: searchQuery, page, limit },
+  });
+};
+
+export const getFollowStatus = async (userId) => {
+  return api.get(`/users/${userId}/follow-status`);
+};
+
+export const getMyFriends = async (page = 1, limit = 20) => {
+  return api.get('/users/me/friends', {
+    params: { page, limit },
+  });
+};
+
 
