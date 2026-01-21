@@ -1,60 +1,29 @@
 /**
  * Track tag form component.
  * 
- * Allows users to add track tags to sets, with SoundCloud search integration.
+ * Allows users to add track tags to sets by searching or entering a URL.
+ * Track name and artist are automatically determined from the selected track.
  */
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
 import * as tracksService from '../../services/tracksService';
+import * as standaloneTracksService from '../../services/standaloneTracksService';
+import useAuthStore from '../../store/authStore';
 
 const TrackTagForm = ({ setId, onSubmit, onCancel, setHasRecording = false }) => {
-  const { register, handleSubmit, setValue, watch, reset } = useForm({
-    defaultValues: {
-      track_name: '',
-      artist_name: '',
-      soundcloud_url: '',
-      timestamp_input: '',
-    }
-  });
+  const { isAuthenticated } = useAuthStore();
   
+  const [searchQuery, setSearchQuery] = useState('');
+  const [urlInput, setUrlInput] = useState('');
+  const [platform, setPlatform] = useState('all'); // 'all', 'soundcloud', 'spotify'
   const [searching, setSearching] = useState(false);
+  const [resolvingUrl, setResolvingUrl] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState(null);
+  const [timestampInput, setTimestampInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  const trackName = watch('track_name');
-  const artistName = watch('artist_name');
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    const query = trackName || artistName || '';
-    
-    if (!query.trim()) {
-      setSearchResults([]);
-      setShowSearchResults(false);
-      return;
-    }
-
-    setSearching(true);
-    try {
-      const response = await tracksService.searchSoundCloud(query, 10);
-      setSearchResults(response.data || []);
-      setShowSearchResults(true);
-    } catch (error) {
-      console.error('Failed to search SoundCloud:', error);
-      setSearchResults([]);
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const handleSelectResult = (result) => {
-    setValue('track_name', result.title);
-    setValue('artist_name', result.artist_name);
-    setValue('soundcloud_url', result.soundcloud_url);
-    setShowSearchResults(false);
-  };
+  const [addingTrack, setAddingTrack] = useState(null);
 
   // Convert MM:SS format to decimal minutes
   const parseTimestamp = (timestampStr) => {
@@ -78,71 +47,281 @@ const TrackTagForm = ({ setId, onSubmit, onCancel, setHasRecording = false }) =>
     return isNaN(decimal) ? null : decimal;
   };
 
-  const handleFormSubmit = async (data) => {
-    if (!data.track_name.trim()) {
-      alert('Please enter a track name');
-      return;
-    }
-
-    // Parse timestamp from MM:SS format to decimal minutes
-    const timestampMinutes = data.timestamp_input ? parseTimestamp(data.timestamp_input) : null;
+  const handleSearch = async (e) => {
+    e.preventDefault();
     
-    if (data.timestamp_input && timestampMinutes === null) {
-      alert('Invalid timestamp format. Please use MM:SS format (e.g., 2:30)');
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setShowSearchResults(false);
       return;
     }
 
-    setSubmitting(true);
+    setSearching(true);
+    setShowSearchResults(true);
     try {
+      let response;
+      if (platform === 'all') {
+        response = await tracksService.searchTracks(searchQuery.trim(), 'all', 20);
+      } else if (platform === 'spotify') {
+        response = await tracksService.searchSpotify(searchQuery.trim(), 20);
+      } else {
+        response = await tracksService.searchSoundCloud(searchQuery.trim(), 20);
+      }
+      setSearchResults(response.data || []);
+    } catch (error) {
+      console.error('Failed to search tracks:', error);
+      alert(error.response?.data?.detail || 'Failed to search tracks');
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleResolveUrl = async () => {
+    if (!urlInput.trim()) {
+      alert('Please enter a SoundCloud or Spotify URL');
+      return;
+    }
+
+    const url = urlInput.trim();
+    const isSoundCloud = url.includes('soundcloud.com');
+    const isSpotify = url.includes('spotify.com') || url.startsWith('spotify:track:');
+
+    if (!isSoundCloud && !isSpotify) {
+      alert('Please enter a valid SoundCloud or Spotify track URL');
+      return;
+    }
+
+    setResolvingUrl(true);
+    try {
+      const response = await tracksService.resolveTrackUrl(url);
+      const trackInfo = response.data;
+      
+      if (!trackInfo) {
+        alert('Could not find track information from the URL. Please try searching instead.');
+        return;
+      }
+
+      // Set as selected track
+      setSelectedTrack(trackInfo);
+      setUrlInput('');
+    } catch (error) {
+      console.error('Failed to resolve URL:', error);
+      alert(error.response?.data?.detail || 'Failed to resolve URL. Please try searching instead.');
+    } finally {
+      setResolvingUrl(false);
+    }
+  };
+
+  const handleSelectResult = (result) => {
+    setSelectedTrack(result);
+    setShowSearchResults(false);
+    setSearchQuery('');
+  };
+
+  const handleAddTrack = async () => {
+    if (!selectedTrack) {
+      alert('Please select a track from search results or enter a URL');
+      return;
+    }
+
+    if (!isAuthenticated()) {
+      alert('Please log in to add tracks');
+      return;
+    }
+
+    setAddingTrack(selectedTrack.id);
+    try {
+      let trackId = null;
+      
+      // Check if track already exists in database
+      if (selectedTrack.exists_in_db && selectedTrack.track_id) {
+        trackId = selectedTrack.track_id;
+      } else {
+        // Create new track in database
+        const trackData = {
+          track_name: selectedTrack.title || '',
+          artist_name: selectedTrack.artist_name || null,
+          soundcloud_url: selectedTrack.soundcloud_url || null,
+          soundcloud_track_id: selectedTrack.platform === 'soundcloud' && selectedTrack.id ? String(selectedTrack.id) : null,
+          spotify_url: selectedTrack.spotify_url || null,
+          spotify_track_id: selectedTrack.platform === 'spotify' && selectedTrack.id ? selectedTrack.id : null,
+          thumbnail_url: selectedTrack.thumbnail_url || null,
+          duration_ms: selectedTrack.duration_ms || null,
+        };
+        
+        const createResponse = await standaloneTracksService.createTrack(trackData);
+        trackId = createResponse.data.id;
+      }
+      
+      // Parse timestamp
+      const timestampMinutes = timestampInput ? parseTimestamp(timestampInput) : null;
+      
+      if (timestampInput && timestampMinutes === null) {
+        alert('Invalid timestamp format. Please use MM:SS format (e.g., 2:30)');
+        setAddingTrack(null);
+        return;
+      }
+      
+      // Link track to set using track_id
       await tracksService.addTrackTag(setId, {
-        track_name: data.track_name.trim(),
-        artist_name: data.artist_name?.trim() || null,
-        soundcloud_url: data.soundcloud_url?.trim() || null,
+        track_id: trackId,
         timestamp_minutes: timestampMinutes,
       });
-      reset();
+      
+      // Reset form and close
+      setSelectedTrack(null);
+      setSearchQuery('');
+      setUrlInput('');
+      setTimestampInput('');
       setSearchResults([]);
       setShowSearchResults(false);
       if (onSubmit) onSubmit();
     } catch (error) {
-      console.error('Failed to add track tag:', error);
-      alert(error.response?.data?.detail || 'Failed to add track tag');
+      console.error('Failed to add track:', error);
+      alert(error.response?.data?.detail || 'Failed to add track');
     } finally {
-      setSubmitting(false);
+      setAddingTrack(null);
     }
+  };
+
+  const formatDuration = (ms) => {
+    if (!ms) return '';
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h3 className="text-lg font-semibold mb-4">Add Track Tag</h3>
       
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-        {/* Track Name */}
+      <div className="space-y-4">
+        {/* Search Section */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Track Name *
+            Search Tracks
           </label>
-          <input
-            {...register('track_name')}
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            placeholder="Enter track name"
-            required
-          />
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search for tracks, artists, or songs..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <select
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="all">All</option>
+              <option value="soundcloud">SoundCloud</option>
+              <option value="spotify">Spotify</option>
+            </select>
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={searching || !searchQuery.trim()}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {searching ? 'Searching...' : '🔍 Search'}
+            </button>
+          </div>
         </div>
 
-        {/* Artist Name */}
+        {/* URL Input Section */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Artist Name
+            Or Enter Track URL
           </label>
-          <input
-            {...register('artist_name')}
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            placeholder="Enter artist name (optional)"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://soundcloud.com/artist/track or https://open.spotify.com/track/..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <button
+              type="button"
+              onClick={handleResolveUrl}
+              disabled={resolvingUrl || !urlInput.trim()}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {resolvingUrl ? 'Resolving...' : 'Resolve'}
+            </button>
+          </div>
         </div>
+
+        {/* Search Results */}
+        {showSearchResults && (
+          <>
+            {searching ? (
+              <div className="text-center py-4 text-sm text-gray-500">
+                Searching...
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="border border-gray-200 rounded-md max-h-60 overflow-y-auto">
+                <div className="p-2 bg-gray-50 border-b border-gray-200">
+                  <p className="text-xs font-medium text-gray-700">Search Results</p>
+                </div>
+                <div className="divide-y divide-gray-200">
+                  {searchResults.map((result) => (
+                    <button
+                      key={result.id}
+                      type="button"
+                      onClick={() => handleSelectResult(result)}
+                      className={`w-full text-left p-3 hover:bg-gray-50 transition-colors ${
+                        selectedTrack?.id === result.id ? 'bg-primary-50 border-l-4 border-primary-500' : ''
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{result.title}</p>
+                          <p className="text-xs text-gray-600">{result.artist_name}</p>
+                          {result.exists_in_db && (
+                            <p className="text-xs text-green-600 mt-1">✓ Already in database</p>
+                          )}
+                        </div>
+                        {selectedTrack?.id === result.id && (
+                          <span className="text-xs text-primary-600 font-medium">✓ Selected</span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-sm text-gray-500">
+                No results found. Try a different search query.
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Selected Track Display */}
+        {selectedTrack && (
+          <div className="bg-primary-50 border border-primary-200 rounded-md p-4">
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">{selectedTrack.title}</p>
+                <p className="text-xs text-gray-600">{selectedTrack.artist_name}</p>
+                {selectedTrack.duration_ms && (
+                  <p className="text-xs text-gray-500 mt-1">⏱️ {formatDuration(selectedTrack.duration_ms)}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTrack(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Timestamp (for sets with recordings) */}
         {setHasRecording && (
@@ -151,8 +330,9 @@ const TrackTagForm = ({ setId, onSubmit, onCancel, setHasRecording = false }) =>
               Timestamp (MM:SS)
             </label>
             <input
-              {...register('timestamp_input')}
               type="text"
+              value={timestampInput}
+              onChange={(e) => setTimestampInput(e.target.value)}
               pattern="[0-9]+:[0-5][0-9]"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               placeholder="e.g., 2:30"
@@ -161,67 +341,15 @@ const TrackTagForm = ({ setId, onSubmit, onCancel, setHasRecording = false }) =>
           </div>
         )}
 
-        {/* SoundCloud URL */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            SoundCloud URL
-          </label>
-          <input
-            {...register('soundcloud_url')}
-            type="url"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            placeholder="https://soundcloud.com/artist/track (optional)"
-          />
-        </div>
-
-        {/* Search SoundCloud Button */}
-        <div>
-          <button
-            type="button"
-            onClick={handleSearch}
-            disabled={searching || (!trackName && !artistName)}
-            className="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {searching ? 'Searching...' : '🔍 Search on SoundCloud'}
-          </button>
-        </div>
-
-        {/* Search Results */}
-        {showSearchResults && searchResults.length > 0 && (
-          <div className="border border-gray-200 rounded-md max-h-60 overflow-y-auto">
-            <div className="p-2 bg-gray-50 border-b border-gray-200">
-              <p className="text-xs font-medium text-gray-700">Search Results</p>
-            </div>
-            <div className="divide-y divide-gray-200">
-              {searchResults.map((result) => (
-                <button
-                  key={result.id}
-                  type="button"
-                  onClick={() => handleSelectResult(result)}
-                  className="w-full text-left p-3 hover:bg-gray-50 transition-colors"
-                >
-                  <p className="text-sm font-medium text-gray-900">{result.title}</p>
-                  <p className="text-xs text-gray-600">{result.artist_name}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {showSearchResults && searchResults.length === 0 && !searching && (
-          <div className="text-center py-4 text-sm text-gray-500">
-            No results found on SoundCloud
-          </div>
-        )}
-
         {/* Form Actions */}
         <div className="flex gap-2">
           <button
-            type="submit"
-            disabled={submitting}
+            type="button"
+            onClick={handleAddTrack}
+            disabled={submitting || !selectedTrack || addingTrack}
             className="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {submitting ? 'Adding...' : 'Add Track'}
+            {addingTrack ? 'Adding...' : 'Add Track'}
           </button>
           {onCancel && (
             <button
@@ -233,7 +361,7 @@ const TrackTagForm = ({ setId, onSubmit, onCancel, setHasRecording = false }) =>
             </button>
           )}
         </div>
-      </form>
+      </div>
     </div>
   );
 };

@@ -84,6 +84,9 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+    track_ratings: Mapped["_List[TrackRating]"] = relationship("TrackRating", back_populates="user", cascade="all, delete-orphan")
+    track_reviews: Mapped["_List[TrackReview]"] = relationship("TrackReview", back_populates="user", cascade="all, delete-orphan")
+    top_tracks: Mapped["_List[UserTopTrack]"] = relationship("UserTopTrack", back_populates="user", cascade="all, delete-orphan")
 
 
 class DJSet(Base):
@@ -137,6 +140,7 @@ class DJSet(Base):
     
     # Relationships for track tags
     track_tags: Mapped["_List[SetTrack]"] = relationship("SetTrack", back_populates="set", cascade="all, delete-orphan")
+    track_links: Mapped["_List[TrackSetLink]"] = relationship("TrackSetLink", back_populates="set", cascade="all, delete-orphan")
     
     # Unique constraint: prevent duplicate sets from same source
     __table_args__ = (
@@ -176,14 +180,95 @@ class SetTrack(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     
+    # Top tracks feature - users can mark tracks as their favorites
+    is_top_track: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    top_track_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 1-5 for ordering top tracks
+    
     # Relationships
     set: Mapped["DJSet"] = relationship("DJSet", back_populates="track_tags")
     added_by: Mapped["User"] = relationship("User", foreign_keys=[added_by_id])
     confirmations: Mapped["_List[TrackConfirmation]"] = relationship("TrackConfirmation", back_populates="track", cascade="all, delete-orphan")
+    # Note: TrackRating and TrackReview now reference Track model, not SetTrack
     
     # Unique constraint: prevent duplicate track tags for same set
     __table_args__ = (
         UniqueConstraint('set_id', 'track_name', 'artist_name', name='uq_set_track'),
+    )
+
+
+class Track(Base):
+    """
+    Track model - independent track entity from SoundCloud or other sources.
+    
+    Tracks can exist independently and be linked to multiple sets.
+    This is separate from SetTrack which represents a track's appearance in a specific set.
+    """
+    __tablename__ = "tracks"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Track information
+    track_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    artist_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    
+    # SoundCloud information
+    soundcloud_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, unique=True)
+    soundcloud_track_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True)
+    
+    # Spotify information
+    spotify_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, unique=True)
+    spotify_track_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True)
+    
+    # Common metadata
+    thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    
+    # Metadata
+    created_by_id: Mapped[Optional[UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    created_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_id])
+    set_links: Mapped["_List[TrackSetLink]"] = relationship("TrackSetLink", back_populates="track", cascade="all, delete-orphan")
+    ratings: Mapped["_List[TrackRating]"] = relationship("TrackRating", back_populates="track", cascade="all, delete-orphan")
+    reviews: Mapped["_List[TrackReview]"] = relationship("TrackReview", back_populates="track", cascade="all, delete-orphan")
+    user_top_tracks: Mapped["_List[UserTopTrack]"] = relationship("UserTopTrack", back_populates="track", cascade="all, delete-orphan")
+
+
+class TrackSetLink(Base):
+    """
+    Track-Set Link model - links tracks to sets (many-to-many).
+    
+    Represents that a track appears in a set, with optional metadata like timestamp.
+    """
+    __tablename__ = "track_set_links"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Foreign keys
+    track_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tracks.id"), nullable=False, index=True)
+    set_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dj_sets.id"), nullable=False, index=True)
+    added_by_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Set-specific metadata
+    position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    timestamp_minutes: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    track: Mapped["Track"] = relationship("Track", back_populates="set_links")
+    set: Mapped["DJSet"] = relationship("DJSet", back_populates="track_links")
+    added_by: Mapped["User"] = relationship("User", foreign_keys=[added_by_id])
+    confirmations: Mapped["_List[TrackConfirmation]"] = relationship("TrackConfirmation", foreign_keys="TrackConfirmation.track_set_link_id", back_populates="track_set_link", cascade="all, delete-orphan")
+    
+    # Unique constraint: prevent duplicate links
+    __table_args__ = (
+        UniqueConstraint('track_id', 'set_id', name='uq_track_set_link'),
     )
 
 
@@ -192,13 +277,15 @@ class TrackConfirmation(Base):
     Track Confirmation model - allows users to confirm or deny if a track tag is correct.
     
     Users can vote on whether a track tag accurately represents what was played in the set.
+    Supports both SetTrack (manually tagged) and TrackSetLink (linked tracks).
     """
     __tablename__ = "track_confirmations"
     
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     
-    # Foreign keys
-    track_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("set_tracks.id"), nullable=False, index=True)
+    # Foreign keys - one of these must be set
+    track_id: Mapped[Optional[UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("set_tracks.id"), nullable=True, index=True)
+    track_set_link_id: Mapped[Optional[UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("track_set_links.id"), nullable=True, index=True)
     user_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     
     # Confirmation status: True = confirmed (correct), False = denied (incorrect)
@@ -209,12 +296,14 @@ class TrackConfirmation(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    track: Mapped["SetTrack"] = relationship("SetTrack", back_populates="confirmations")
+    track: Mapped[Optional["SetTrack"]] = relationship("SetTrack", back_populates="confirmations", foreign_keys=[track_id])
+    track_set_link: Mapped[Optional["TrackSetLink"]] = relationship("TrackSetLink", foreign_keys=[track_set_link_id])
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
     
-    # Unique constraint: user can only confirm/deny a track once
+    # Unique constraints: user can only confirm/deny a track once (for each type)
     __table_args__ = (
-        UniqueConstraint('user_id', 'track_id', name='uq_user_track_confirmation'),
+        UniqueConstraint('user_id', 'track_id', name='uq_user_set_track_confirmation'),
+        UniqueConstraint('user_id', 'track_set_link_id', name='uq_user_track_set_link_confirmation'),
     )
 
 
@@ -316,6 +405,100 @@ class Review(Base):
     # Unique constraint: one review per user per set
     __table_args__ = (
         UniqueConstraint('user_id', 'set_id', name='uq_user_set_review'),
+    )
+
+
+class UserTopTrack(Base):
+    """
+    User Top Track model - users can mark up to 5 tracks as their favorites.
+    """
+    __tablename__ = "user_top_tracks"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Foreign keys
+    user_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    track_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tracks.id"), nullable=False, index=True)
+    
+    # Order (1-5)
+    order: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-5 for ordering top tracks
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="top_tracks")
+    track: Mapped["Track"] = relationship("Track", back_populates="user_top_tracks")
+    
+    # Unique constraints
+    __table_args__ = (
+        UniqueConstraint('user_id', 'track_id', name='uq_user_top_track'),
+        UniqueConstraint('user_id', 'order', name='uq_user_top_track_order'),
+    )
+
+
+class TrackRating(Base):
+    """
+    Track Rating model - stores user ratings for individual tracks.
+    
+    Users can rate tracks with half-star increments from 0.5 to 5.0.
+    """
+    __tablename__ = "track_ratings"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Foreign keys
+    user_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    track_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tracks.id"), nullable=False, index=True)
+    
+    # Rating value (0.5, 1.0, 1.5, ..., 5.0)
+    rating: Mapped[float] = mapped_column(Float, nullable=False)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="track_ratings")
+    track: Mapped["Track"] = relationship("Track", back_populates="ratings")
+    
+    # Unique constraint: one rating per user per track
+    __table_args__ = (
+        UniqueConstraint('user_id', 'track_id', name='uq_user_track_rating'),
+    )
+
+
+class TrackReview(Base):
+    """
+    Track Review model - user-written reviews for individual tracks.
+    
+    Users can write reviews for tracks. Reviews are optional
+    and separate from ratings (users can rate without reviewing).
+    """
+    __tablename__ = "track_reviews"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Foreign keys
+    user_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    track_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tracks.id"), nullable=False, index=True)
+    
+    # Review content
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    contains_spoilers: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="track_reviews")
+    track: Mapped["Track"] = relationship("Track", back_populates="reviews")
+    
+    # Unique constraint: one review per user per track
+    __table_args__ = (
+        UniqueConstraint('user_id', 'track_id', name='uq_user_track_review'),
     )
 
 

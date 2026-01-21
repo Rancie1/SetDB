@@ -6,13 +6,13 @@ Handles user profiles, statistics, and following functionality.
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, join, or_
 from uuid import UUID
 from typing import Optional
 
 from app.database import get_db
-from app.models import User, Follow, UserSetLog, Review, List, Rating
-from app.schemas import UserResponse, UserUpdate, UserStats, PaginatedResponse
+from app.models import User, Follow, UserSetLog, Review, List, Rating, DJSet, EventConfirmation, Event, SetTrack, Track, UserTopTrack
+from app.schemas import UserResponse, UserUpdate, UserStats, PaginatedResponse, SetTrackResponse, TrackResponse
 from app.auth import get_current_active_user
 from fastapi import Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -220,13 +220,40 @@ async def get_user_stats(
     )
     followers_count = followers_result.scalar() or 0
     
+    # Calculate total hours listened (from all logged sets, both live and listened)
+    # Join UserSetLog with DJSet to get duration_minutes
+    hours_result = await db.execute(
+        select(func.sum(DJSet.duration_minutes))
+        .select_from(UserSetLog)
+        .join(DJSet, UserSetLog.set_id == DJSet.id)
+        .where(UserSetLog.user_id == user_id)
+        .where(DJSet.duration_minutes.isnot(None))
+    )
+    total_minutes = hours_result.scalar()
+    if total_minutes is None:
+        total_minutes = 0
+    hours_listened = round(total_minutes / 60.0, 1) if total_minutes > 0 else 0.0
+    
+    # Count distinct venues attended (from events user has confirmed attendance)
+    venues_result = await db.execute(
+        select(func.count(func.distinct(Event.venue_location)))
+        .select_from(EventConfirmation)
+        .join(Event, EventConfirmation.event_id == Event.id)
+        .where(EventConfirmation.user_id == user_id)
+        .where(Event.venue_location.isnot(None))
+        .where(Event.venue_location != '')
+    )
+    venues_attended = venues_result.scalar() or 0
+    
     return UserStats(
         sets_logged=sets_logged,
         reviews_written=reviews_written,
         lists_created=lists_created,
         average_rating=float(average_rating) if average_rating else None,
         following_count=following_count,
-        followers_count=followers_count
+        followers_count=followers_count,
+        hours_listened=hours_listened,
+        venues_attended=venues_attended
     )
 
 
@@ -301,6 +328,65 @@ async def unfollow_user(
     await db.commit()
     
     return None
+
+
+@router.get("/{user_id}/top-tracks", response_model=list)
+async def get_user_top_tracks(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get a user's top 5 tracks.
+    
+    Returns the tracks marked as top tracks, ordered by order (1-5).
+    """
+    # Check if user exists
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found"
+        )
+    
+    # Get top tracks ordered by order
+    query = (
+        select(Track, UserTopTrack.order)
+        .join(UserTopTrack, Track.id == UserTopTrack.track_id)
+        .where(UserTopTrack.user_id == user_id)
+        .order_by(UserTopTrack.order.asc())
+        .limit(5)
+    )
+    
+    result = await db.execute(query)
+    tracks_with_order = result.all()
+    
+    # Load relationships and convert to response schemas
+    top_tracks = []
+    for track, order in tracks_with_order:
+        # Get rating stats
+        from app.models import TrackRating
+        rating_query = (
+            select(
+                func.avg(TrackRating.rating).label('avg_rating'),
+                func.count(TrackRating.id).label('rating_count')
+            )
+            .where(TrackRating.track_id == track.id)
+        )
+        rating_result = await db.execute(rating_query)
+        rating_row = rating_result.first()
+        avg_rating = rating_row[0] if rating_row else None
+        rating_count = rating_row[1] if rating_row else 0
+        
+        track_dict = TrackResponse.model_validate(track).model_dump()
+        track_dict['average_rating'] = float(avg_rating) if avg_rating else None
+        track_dict['rating_count'] = rating_count
+        track_dict['is_top_track'] = True
+        track_dict['top_track_order'] = order
+        top_tracks.append(track_dict)
+    
+    return top_tracks
 
 
 @router.get("/me/friends", response_model=PaginatedResponse)

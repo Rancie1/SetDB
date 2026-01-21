@@ -21,20 +21,29 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Convert timestamp_seconds to timestamp_minutes
-    # First, convert existing seconds to minutes (divide by 60) and change type
-    op.execute("""
-        ALTER TABLE set_tracks 
-        ADD COLUMN timestamp_minutes NUMERIC(10, 2);
-    """)
+    # Check if timestamp_minutes already exists (in case migration was partially run)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('set_tracks')]
     
-    op.execute("""
-        UPDATE set_tracks
-        SET timestamp_minutes = ROUND(timestamp_seconds / 60.0, 2)
-        WHERE timestamp_seconds IS NOT NULL
-    """)
+    # Only add column if it doesn't exist
+    if 'timestamp_minutes' not in columns:
+        op.execute("""
+            ALTER TABLE set_tracks 
+            ADD COLUMN timestamp_minutes NUMERIC(10, 2);
+        """)
+        
+        # Convert existing seconds to minutes if timestamp_seconds exists
+        if 'timestamp_seconds' in columns:
+            op.execute("""
+                UPDATE set_tracks
+                SET timestamp_minutes = ROUND(timestamp_seconds / 60.0, 2)
+                WHERE timestamp_seconds IS NOT NULL
+            """)
     
-    # Drop old column
-    op.drop_column('set_tracks', 'timestamp_seconds')
+    # Drop old column if it exists
+    if 'timestamp_seconds' in columns:
+        op.drop_column('set_tracks', 'timestamp_seconds')
 
 
 def downgrade() -> None:

@@ -13,6 +13,7 @@ import * as eventsService from '../../services/eventsService';
 import UserStats from './UserStats';
 import SetCard from '../sets/SetCard';
 import TopSets from './TopSets';
+import TopTracks from './TopTracks';
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -291,6 +292,11 @@ const UserProfile = () => {
           />
         </div>
       )}
+      
+      {/* Top Tracks */}
+      <div className="mb-6">
+        <TopTracks userId={id} isOwnProfile={isOwnProfile} />
+      </div>
 
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">

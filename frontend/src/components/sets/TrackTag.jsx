@@ -4,13 +4,21 @@
  * Displays a single track tag with SoundCloud link, timestamp, and confirmation buttons.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as tracksService from '../../services/tracksService';
+import * as trackRatingsService from '../../services/trackRatingsService';
 import useAuthStore from '../../store/authStore';
 
-const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasRecording }) => {
+const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasRecording, onRatingChange }) => {
   const { isAuthenticated, user } = useAuthStore();
   const [confirming, setConfirming] = useState(false);
+  const [rating, setRating] = useState(track.user_rating || null);
+  const [ratingLoading, setRatingLoading] = useState(false);
+  const [showRatingSelector, setShowRatingSelector] = useState(false);
+  
+  useEffect(() => {
+    setRating(track.user_rating || null);
+  }, [track.user_rating]);
   
   const displayName = track.artist_name
     ? `${track.track_name} - ${track.artist_name}`
@@ -88,7 +96,7 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <p className="text-sm font-medium text-gray-900">{track.track_name}</p>
-            {track.timestamp_minutes != null && setHasRecording && (
+            {(track.timestamp_minutes != null && track.timestamp_minutes !== undefined) && setHasRecording && (
               <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
                 {formatTimestamp(track.timestamp_minutes)}
               </span>
@@ -98,14 +106,86 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
             <p className="text-xs text-gray-600 mb-2">{track.artist_name}</p>
           )}
           
-          {/* Confirmation Stats */}
-          {(track.confirmation_count > 0 || track.denial_count > 0) && (
-            <div className="flex items-center gap-3 text-xs text-gray-500 mt-2">
-              {track.confirmation_count > 0 && (
-                <span className="text-green-600">✓ {track.confirmation_count} confirmed</span>
+          {/* Rating and Confirmation Stats */}
+          <div className="flex items-center gap-3 text-xs text-gray-500 mt-2 flex-wrap">
+            {track.average_rating && (
+              <span className="text-yellow-600">⭐ {track.average_rating.toFixed(1)} ({track.rating_count || 0})</span>
+            )}
+            {track.confirmation_count > 0 && (
+              <span className="text-green-600">✓ {track.confirmation_count} confirmed</span>
+            )}
+            {track.denial_count > 0 && (
+              <span className="text-red-600">✗ {track.denial_count} denied</span>
+            )}
+          </div>
+          
+          {/* Track Rating */}
+          {isAuthenticated && (
+            <div className="mt-2">
+              {rating ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-600">
+                    Your rating: <span className="font-semibold text-yellow-600">⭐ {rating.toFixed(1)}</span>
+                  </span>
+                  <button
+                    onClick={() => setShowRatingSelector(!showRatingSelector)}
+                    className="text-xs text-primary-600 hover:text-primary-700"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowRatingSelector(!showRatingSelector)}
+                  className="text-xs text-primary-600 hover:text-primary-700"
+                >
+                  Rate this track
+                </button>
               )}
-              {track.denial_count > 0 && (
-                <span className="text-red-600">✗ {track.denial_count} denied</span>
+              
+              {showRatingSelector && (
+                <div className="mt-2 flex items-center gap-1 flex-wrap">
+                  {[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0].map((starValue) => (
+                    <button
+                      key={starValue}
+                      onClick={async () => {
+                        if (!isAuthenticated) {
+                          alert('Please log in to rate tracks');
+                          return;
+                        }
+                        setRatingLoading(true);
+                        try {
+                          await trackRatingsService.createTrackRating(track.id, starValue);
+                          setRating(starValue);
+                          setShowRatingSelector(false);
+                          if (onRatingChange) {
+                            await onRatingChange();
+                          }
+                        } catch (error) {
+                          console.error('Failed to rate track:', error);
+                          alert(error.response?.data?.detail || 'Failed to rate track');
+                        } finally {
+                          setRatingLoading(false);
+                        }
+                      }}
+                      disabled={ratingLoading}
+                      className={`text-sm px-1 py-0.5 rounded ${
+                        rating && starValue <= rating
+                          ? 'text-yellow-500 font-bold'
+                          : 'text-gray-400 hover:text-yellow-300'
+                      } disabled:opacity-50`}
+                      title={`${starValue} stars`}
+                    >
+                      {starValue % 1 === 0 ? '★' : '☆'}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setShowRatingSelector(false)}
+                    className="text-xs text-gray-500 ml-2"
+                  >
+                    Cancel
+                  </button>
+                </div>
               )}
             </div>
           )}

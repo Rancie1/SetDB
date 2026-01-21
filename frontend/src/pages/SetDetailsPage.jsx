@@ -842,11 +842,12 @@ const SetDetailsPage = () => {
               <div className="space-y-2">
                 {trackTags.map((track) => (
                   <TrackTag
-                    key={`${track.id}-${String(track.user_confirmation)}-${track.confirmation_count}-${track.denial_count}`}
+                    key={`${track.id}-${String(track.user_confirmation)}-${track.confirmation_count}-${track.denial_count}-${track.user_rating}`}
                     track={track}
                     onDelete={handleRemoveTrackTag}
                     canDelete={isAuthenticated && String(user?.id) === String(track.added_by_id)}
                     onConfirmationChange={loadTrackTags}
+                    onRatingChange={loadTrackTags}
                     setHasRecording={!!currentSet?.recording_url}
                   />
                 ))}

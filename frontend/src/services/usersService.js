@@ -54,4 +54,8 @@ export const getMyFriends = async (page = 1, limit = 20) => {
   });
 };
 
+export const getUserTopTracks = async (userId) => {
+  return api.get(`/users/${userId}/top-tracks`);
+};
+
 

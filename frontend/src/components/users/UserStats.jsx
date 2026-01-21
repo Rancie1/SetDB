@@ -19,11 +19,30 @@ const UserStats = ({ stats, loading }) => {
     return <div className="text-gray-500">No statistics available</div>;
   }
 
+  const formatHours = (hours) => {
+    if (hours === 0) return '0';
+    if (hours < 1) {
+      const minutes = Math.round(hours * 60);
+      return `${minutes}m`;
+    }
+    if (hours < 10) {
+      return hours.toFixed(1);
+    }
+    return Math.round(hours).toString();
+  };
+
   const statItems = [
     {
       label: 'Sets Logged',
       value: stats.sets_logged || 0,
       icon: '🎧',
+    },
+    {
+      label: 'Hours Listened',
+      value: stats.hours_listened !== undefined 
+        ? `${formatHours(stats.hours_listened)}`
+        : '0',
+      icon: '⏱️',
     },
     {
       label: 'Reviews Written',
@@ -50,10 +69,15 @@ const UserStats = ({ stats, loading }) => {
       value: stats.followers_count || 0,
       icon: '❤️',
     },
+    {
+      label: 'Venues Attended',
+      value: stats.venues_attended || 0,
+      icon: '📍',
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {statItems.map((item, index) => (
         <div
           key={index}

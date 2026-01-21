@@ -158,9 +158,23 @@ async def import_set_as_live(
         raise Exception(f"Unsupported source: {source}")
     
     # Generate unique source_url for live set
+    # Clean the title and dj_name to avoid special characters that might cause issues
     from uuid import uuid4
+    import re
+    clean_dj_name = re.sub(r'[^\w\s-]', '', set_data.get('dj_name', 'Unknown'))[:50]
+    clean_title = re.sub(r'[^\w\s-]', '', set_data.get('title', 'Untitled'))[:50]
     unique_id = str(uuid4())[:8]
-    live_source_url = f"live://{set_data['dj_name']}-{set_data['title']}-{unique_id}"
+    live_source_url = f"live://{clean_dj_name}-{clean_title}-{unique_id}"
+    
+    # Ensure uniqueness by checking if this source_url already exists
+    from sqlalchemy import select
+    existing_check = await db.execute(
+        select(DJSet).where(DJSet.source_url == live_source_url)
+    )
+    if existing_check.scalar_one_or_none():
+        # If somehow duplicate, add more randomness
+        unique_id = str(uuid4())
+        live_source_url = f"live://{clean_dj_name}-{clean_title}-{unique_id}"
     
     # Create live set with recording URL (NOT an event)
     new_set = DJSet(
@@ -174,10 +188,7 @@ async def import_set_as_live(
         duration_minutes=set_data.get("duration_minutes"),
         recording_url=url,  # Store the YouTube/SoundCloud URL as recording
         extra_metadata=set_data.get("metadata"),
-        is_event=False,  # This is a live set, not an event
-        created_by_id=user_id,
-        is_verified=False,  # Live sets don't need verification
-        confirmation_count=0
+        created_by_id=user_id
     )
     
     db.add(new_set)

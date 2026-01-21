@@ -19,8 +19,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add duration_days column to events table
-    op.add_column('events', sa.Column('duration_days', sa.Integer(), nullable=True))
+    # Add duration_days column to events table (check if it already exists)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('events')]
+    
+    if 'duration_days' not in columns:
+        op.add_column('events', sa.Column('duration_days', sa.Integer(), nullable=True))
 
 
 def downgrade() -> None:

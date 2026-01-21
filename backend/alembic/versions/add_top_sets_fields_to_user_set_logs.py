@@ -19,14 +19,23 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add is_top_set column
-    op.add_column('user_set_logs', sa.Column('is_top_set', sa.Boolean(), nullable=False, server_default='false'))
+    # Check if columns already exist (in case migration was partially run)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('user_set_logs')]
+    indexes = [idx['name'] for idx in inspector.get_indexes('user_set_logs')]
     
-    # Add top_set_order column
-    op.add_column('user_set_logs', sa.Column('top_set_order', sa.Integer(), nullable=True))
+    # Add is_top_set column if it doesn't exist
+    if 'is_top_set' not in columns:
+        op.add_column('user_set_logs', sa.Column('is_top_set', sa.Boolean(), nullable=False, server_default='false'))
     
-    # Create index on is_top_set for faster queries
-    op.create_index('ix_user_set_logs_is_top_set', 'user_set_logs', ['is_top_set'])
+    # Add top_set_order column if it doesn't exist
+    if 'top_set_order' not in columns:
+        op.add_column('user_set_logs', sa.Column('top_set_order', sa.Integer(), nullable=True))
+    
+    # Create index on is_top_set for faster queries if it doesn't exist
+    if 'ix_user_set_logs_is_top_set' not in indexes:
+        op.create_index('ix_user_set_logs_is_top_set', 'user_set_logs', ['is_top_set'])
 
 
 def downgrade() -> None:

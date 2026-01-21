@@ -13,6 +13,7 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DiscoverPage from './pages/DiscoverPage';
+import TracksDiscoverPage from './pages/TracksDiscoverPage';
 import EventsPage from './pages/EventsPage';
 import EventDetailsPage from './pages/EventDetailsPage';
 import CreateEventPage from './pages/CreateEventPage';
@@ -22,6 +23,7 @@ import FriendsPage from './pages/FriendsPage';
 import ManageProfilePage from './pages/ManageProfilePage';
 import SoundCloudCallbackPage from './pages/SoundCloudCallbackPage';
 import SetDetailsPage from './pages/SetDetailsPage';
+import TrackDetailsPage from './pages/TrackDetailsPage';
 
 function App() {
   const { checkAuth } = useAuthStore();
@@ -67,10 +69,18 @@ function App() {
           }
         />
         <Route
-          path="/discover"
+          path="/sets"
           element={
             <Layout>
               <DiscoverPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/tracks"
+          element={
+            <Layout>
+              <TracksDiscoverPage />
             </Layout>
           }
         />
@@ -118,6 +128,14 @@ function App() {
           element={
             <Layout>
               <SetDetailsPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/tracks/:id"
+          element={
+            <Layout>
+              <TrackDetailsPage />
             </Layout>
           }
         />

@@ -349,6 +349,9 @@ async def import_from_soundcloud(
         # Convert to response schema
         return DJSetResponse.model_validate(imported_set)
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"SoundCloud import failed for URL {import_request.url}: {str(e)}", exc_info=True)
         raise ExternalAPIError(f"Failed to import from SoundCloud: {str(e)}")
 
 

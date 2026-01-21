@@ -208,7 +208,8 @@ class ReviewResponse(BaseSchema):
 
 class SetTrackCreate(BaseSchema):
     """Schema for creating a track tag."""
-    track_name: str = Field(..., min_length=1, max_length=255)
+    track_id: Optional[UUID] = Field(None, description="Optional: ID of existing Track entity to link. If provided, track_name/artist_name are optional.")
+    track_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Required if track_id not provided")
     artist_name: Optional[str] = Field(None, max_length=255)
     soundcloud_url: Optional[str] = Field(None, max_length=500)
     position: Optional[int] = Field(None, ge=0)
@@ -235,6 +236,8 @@ class SetTrackResponse(BaseSchema):
     soundcloud_track_id: Optional[str] = None
     position: Optional[int] = None
     timestamp_minutes: Optional[float] = None
+    is_top_track: Optional[bool] = False
+    top_track_order: Optional[int] = None
     created_at: datetime
     # Include user info for display
     added_by: Optional[UserResponse] = None
@@ -242,6 +245,11 @@ class SetTrackResponse(BaseSchema):
     confirmation_count: Optional[int] = 0
     denial_count: Optional[int] = 0
     user_confirmation: Optional[bool] = None  # Current user's confirmation status
+    supports_confirmations: Optional[bool] = True  # Whether this track supports confirmations (SetTrack = True, TrackSetLink = False)
+    # Rating stats
+    average_rating: Optional[float] = None
+    rating_count: Optional[int] = 0
+    user_rating: Optional[float] = None  # Current user's rating
 
 
 class TrackConfirmationCreate(BaseSchema):
@@ -252,12 +260,133 @@ class TrackConfirmationCreate(BaseSchema):
 class TrackConfirmationResponse(BaseSchema):
     """Schema for track confirmation response."""
     id: UUID
-    track_id: UUID
+    track_id: Optional[UUID] = None  # For SetTrack entries
+    track_set_link_id: Optional[UUID] = None  # For TrackSetLink entries
     user_id: UUID
     is_confirmed: bool
     created_at: datetime
     updated_at: datetime
     user: Optional[UserResponse] = None
+
+
+# ============================================================================
+# TRACK SCHEMAS (Independent Track Entity)
+# ============================================================================
+
+class TrackCreate(BaseSchema):
+    """Schema for creating an independent track."""
+    track_name: str = Field(..., min_length=1, max_length=255)
+    artist_name: Optional[str] = Field(None, max_length=255)
+    soundcloud_url: Optional[str] = Field(None, max_length=500)
+    soundcloud_track_id: Optional[str] = Field(None, max_length=255)
+    spotify_url: Optional[str] = Field(None, max_length=500)
+    spotify_track_id: Optional[str] = Field(None, max_length=255)
+    thumbnail_url: Optional[str] = Field(None, max_length=500)
+    duration_ms: Optional[int] = None
+
+
+class TrackResponse(BaseSchema):
+    """Schema for track response."""
+    id: UUID
+    track_name: str
+    artist_name: Optional[str] = None
+    soundcloud_url: Optional[str] = None
+    soundcloud_track_id: Optional[str] = None
+    spotify_url: Optional[str] = None
+    spotify_track_id: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    duration_ms: Optional[int] = None
+    created_by_id: Optional[UUID] = None
+    created_at: datetime
+    updated_at: datetime
+    # Stats
+    average_rating: Optional[float] = None
+    rating_count: Optional[int] = 0
+    user_rating: Optional[float] = None  # Current user's rating
+    linked_sets_count: Optional[int] = 0
+    is_top_track: Optional[bool] = False
+    top_track_order: Optional[int] = None
+
+
+class TrackSetLinkCreate(BaseSchema):
+    """Schema for linking a track to a set."""
+    set_id: UUID
+    position: Optional[int] = None
+    timestamp_minutes: Optional[float] = None
+
+
+class TrackSetLinkResponse(BaseSchema):
+    """Schema for track-set link response."""
+    id: UUID
+    track_id: UUID
+    set_id: UUID
+    added_by_id: UUID
+    position: Optional[int] = None
+    timestamp_minutes: Optional[float] = None
+    created_at: datetime
+    track: Optional[TrackResponse] = None
+    set: Optional[DJSetResponse] = None
+
+
+# ============================================================================
+# TRACK RATING SCHEMAS
+# ============================================================================
+
+class TrackRatingCreate(BaseSchema):
+    """Schema for creating a track rating."""
+    track_id: UUID
+    rating: float = Field(..., ge=0.5, le=5.0, description="Rating from 0.5 to 5.0 stars")
+
+
+class TrackRatingUpdate(BaseSchema):
+    """Schema for updating a track rating."""
+    rating: float = Field(..., ge=0.5, le=5.0, description="Rating from 0.5 to 5.0 stars")
+
+
+class TrackRatingResponse(BaseSchema):
+    """Schema for track rating response."""
+    id: UUID
+    user_id: UUID
+    track_id: UUID
+    rating: float
+    created_at: datetime
+    updated_at: datetime
+    user: Optional[UserResponse] = None
+
+
+# ============================================================================
+# TRACK REVIEW SCHEMAS
+# ============================================================================
+
+class TrackReviewCreate(BaseSchema):
+    """Schema for creating a track review."""
+    track_id: UUID
+    content: str = Field(..., min_length=1)
+    contains_spoilers: bool = False
+    is_public: bool = True
+
+
+class TrackReviewUpdate(BaseSchema):
+    """Schema for updating a track review."""
+    content: Optional[str] = Field(None, min_length=1)
+    contains_spoilers: Optional[bool] = None
+    is_public: Optional[bool] = None
+
+
+class TrackReviewResponse(BaseSchema):
+    """Schema for track review response."""
+    id: UUID
+    user_id: UUID
+    track_id: UUID
+    content: str
+    contains_spoilers: bool
+    is_public: bool
+    created_at: datetime
+    updated_at: datetime
+    user: Optional[UserResponse] = None
+    user_rating: Optional[float] = None
+
+
 
 
 # ============================================================================
@@ -357,6 +486,8 @@ class UserStats(BaseSchema):
     average_rating: Optional[float] = None
     following_count: int
     followers_count: int
+    hours_listened: float = 0.0
+    venues_attended: int = 0
 
 
 # ============================================================================

@@ -490,19 +490,23 @@ async def import_from_soundcloud_url(url: str) -> Dict:
         logger.warning("API unavailable, falling back to oEmbed-only import")
         track_info = await fetch_soundcloud_track_info(url)
     
+    # Ensure we got track info
+    if not track_info:
+        raise Exception("Failed to fetch track information from SoundCloud. Please check the URL and try again.")
+    
     # Build metadata with publish date if available
     metadata = track_info.get("metadata", {})
     if track_info.get("created_at"):
         metadata["published_at"] = track_info["created_at"]
     
     return {
-        "title": track_info["title"],
-        "dj_name": track_info["dj_name"],
+        "title": track_info.get("title", "Untitled"),
+        "dj_name": track_info.get("dj_name", "Unknown Artist"),
         "source_type": "soundcloud",
         "source_id": track_id,
         "source_url": url,
-        "description": track_info["description"],
-        "thumbnail_url": track_info["thumbnail_url"],  # This comes from oEmbed when using API
+        "description": track_info.get("description"),
+        "thumbnail_url": track_info.get("thumbnail_url"),
         "duration_minutes": track_info.get("duration_minutes"),
         "metadata": metadata
     }
