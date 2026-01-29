@@ -11,8 +11,8 @@ from uuid import UUID
 from typing import Optional
 
 from app.database import get_db
-from app.models import User, Follow, UserSetLog, Review, List, Rating, DJSet, EventConfirmation, Event, SetTrack, Track, UserTopTrack
-from app.schemas import UserResponse, UserUpdate, UserStats, PaginatedResponse, SetTrackResponse, TrackResponse
+from app.models import User, Follow, UserSetLog, Review, List, Rating, DJSet, EventConfirmation, Event, SetTrack, Track, UserTopTrack, UserTopEvent, UserTopVenue, TrackReview, TrackRating
+from app.schemas import UserResponse, UserUpdate, UserStats, PaginatedResponse, SetTrackResponse, TrackResponse, ActivityItem, ReviewResponse, RatingResponse, TrackReviewResponse, TrackRatingResponse, DJSetResponse, LogResponse, EventResponse
 from app.auth import get_current_active_user
 from fastapi import Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -101,6 +101,297 @@ async def search_users(
         limit=limit,
         pages=pages
     )
+
+
+@router.get("/activity-feed")
+async def get_activity_feed(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    friends_only: str = Query("false"),
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """
+    Get activity feed showing reviews, ratings, top track/set additions, and event activities.
+    
+    Returns activity from:
+    - Set reviews and ratings
+    - Track reviews and ratings  
+    - Top track additions (when users add tracks to their top 5)
+    - Top set additions (when users add sets to their top 5)
+    - Event creation (when users create events)
+    - Event confirmations (when users confirm they attended events)
+    
+    If friends_only='true' and user is authenticated, only shows activity from followed users.
+    If friends_only='false' or omitted or user is not authenticated, shows all public activity.
+    """
+    # Convert string to boolean - handle various boolean representations
+    friends_only_lower = str(friends_only).lower().strip() if friends_only else "false"
+    friends_only_bool = friends_only_lower in ('true', '1', 'yes', 'on', 't')
+    
+    # Determine which users' activity to show
+    user_ids = None
+    if friends_only_bool:
+        if not current_user:
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "limit": limit,
+                "pages": 0
+            }
+        # Get list of followed user IDs
+        following_result = await db.execute(
+            select(Follow.following_id).where(Follow.follower_id == current_user.id)
+        )
+        user_ids = [row[0] for row in following_result.all()]
+        
+        if not user_ids:
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "limit": limit,
+                "pages": 0
+            }
+    
+    # Collect all activities
+    activities = []
+    
+    # Set reviews
+    set_reviews_query = select(Review).where(Review.is_public == True)
+    if user_ids:
+        set_reviews_query = set_reviews_query.where(Review.user_id.in_(user_ids))
+    set_reviews_query = set_reviews_query.order_by(Review.created_at.desc()).limit(limit * 3)
+    set_reviews_result = await db.execute(set_reviews_query)
+    set_reviews = set_reviews_result.scalars().all()
+    
+    for review in set_reviews:
+        await db.refresh(review, ["user", "set"])
+        review_response = ReviewResponse.model_validate(review)
+        # Add set data to review response dict
+        review_dict = review_response.model_dump()
+        if review.set:
+            review_dict["set"] = DJSetResponse.model_validate(review.set).model_dump()
+        activities.append({
+            "activity_type": "set_review",
+            "created_at": review.created_at,
+            "user": UserResponse.model_validate(review.user).model_dump(),
+            "set_review": review_dict,
+            "set_rating": None,
+            "track_review": None,
+            "track_rating": None,
+            "top_track": None,
+            "top_set": None,
+            "event_created": None,
+            "event_confirmed": None
+        })
+    
+    # Set ratings
+    set_ratings_query = select(Rating)
+    if user_ids:
+        set_ratings_query = set_ratings_query.where(Rating.user_id.in_(user_ids))
+    set_ratings_query = set_ratings_query.order_by(Rating.created_at.desc()).limit(limit * 3)
+    set_ratings_result = await db.execute(set_ratings_query)
+    set_ratings = set_ratings_result.scalars().all()
+    
+    for rating in set_ratings:
+        await db.refresh(rating, ["user", "set"])
+        rating_dict = RatingResponse.model_validate(rating).model_dump()
+        rating_dict["set"] = DJSetResponse.model_validate(rating.set).model_dump() if rating.set else None
+        activities.append({
+            "activity_type": "set_rating",
+            "created_at": rating.created_at,
+            "user": UserResponse.model_validate(rating.user).model_dump(),
+            "set_review": None,
+            "set_rating": rating_dict,
+            "track_review": None,
+            "track_rating": None,
+            "top_track": None,
+            "top_set": None,
+            "event_created": None,
+            "event_confirmed": None
+        })
+    
+    # Track reviews
+    track_reviews_query = select(TrackReview).where(TrackReview.is_public == True)
+    if user_ids:
+        track_reviews_query = track_reviews_query.where(TrackReview.user_id.in_(user_ids))
+    track_reviews_query = track_reviews_query.order_by(TrackReview.created_at.desc()).limit(limit * 3)
+    track_reviews_result = await db.execute(track_reviews_query)
+    track_reviews = track_reviews_result.scalars().all()
+    
+    for review in track_reviews:
+        await db.refresh(review, ["user", "track"])
+        review_dict = TrackReviewResponse.model_validate(review).model_dump()
+        review_dict["track"] = TrackResponse.model_validate(review.track).model_dump() if review.track else None
+        activities.append({
+            "activity_type": "track_review",
+            "created_at": review.created_at,
+            "user": UserResponse.model_validate(review.user).model_dump(),
+            "set_review": None,
+            "set_rating": None,
+            "track_review": review_dict,
+            "track_rating": None,
+            "top_track": None,
+            "top_set": None,
+            "event_created": None,
+            "event_confirmed": None
+        })
+    
+    # Track ratings
+    track_ratings_query = select(TrackRating)
+    if user_ids:
+        track_ratings_query = track_ratings_query.where(TrackRating.user_id.in_(user_ids))
+    track_ratings_query = track_ratings_query.order_by(TrackRating.created_at.desc()).limit(limit * 3)
+    track_ratings_result = await db.execute(track_ratings_query)
+    track_ratings = track_ratings_result.scalars().all()
+    
+    for rating in track_ratings:
+        await db.refresh(rating, ["user", "track"])
+        rating_dict = TrackRatingResponse.model_validate(rating).model_dump()
+        rating_dict["track"] = TrackResponse.model_validate(rating.track).model_dump() if rating.track else None
+        activities.append({
+            "activity_type": "track_rating",
+            "created_at": rating.created_at,
+            "user": UserResponse.model_validate(rating.user).model_dump(),
+            "set_review": None,
+            "set_rating": None,
+            "track_review": None,
+            "track_rating": rating_dict,
+            "top_track": None,
+            "top_set": None,
+            "event_created": None,
+            "event_confirmed": None
+        })
+    
+    # Top tracks (when users add tracks to their top 5)
+    top_tracks_query = select(UserTopTrack)
+    if user_ids:
+        top_tracks_query = top_tracks_query.where(UserTopTrack.user_id.in_(user_ids))
+    top_tracks_query = top_tracks_query.order_by(UserTopTrack.created_at.desc()).limit(limit * 3)
+    top_tracks_result = await db.execute(top_tracks_query)
+    top_tracks = top_tracks_result.scalars().all()
+    
+    for top_track in top_tracks:
+        await db.refresh(top_track, ["user", "track"])
+        activities.append({
+            "activity_type": "top_track",
+            "created_at": top_track.created_at,
+            "user": UserResponse.model_validate(top_track.user).model_dump(),
+            "set_review": None,
+            "set_rating": None,
+            "track_review": None,
+            "track_rating": None,
+            "top_track": {
+                "track": TrackResponse.model_validate(top_track.track).model_dump(),
+                "order": top_track.order
+            },
+            "top_set": None,
+            "event_created": None,
+            "event_confirmed": None
+        })
+    
+    # Top sets (when users add sets to their top 5)
+    # We need to track when is_top_set changes, but since we don't have an update timestamp,
+    # we'll use created_at from UserSetLog when is_top_set=True
+    top_sets_query = select(UserSetLog).where(UserSetLog.is_top_set == True)
+    if user_ids:
+        top_sets_query = top_sets_query.where(UserSetLog.user_id.in_(user_ids))
+    top_sets_query = top_sets_query.order_by(UserSetLog.created_at.desc()).limit(limit * 3)
+    top_sets_result = await db.execute(top_sets_query)
+    top_sets = top_sets_result.scalars().all()
+    
+    for log in top_sets:
+        await db.refresh(log, ["user", "set"])
+        activities.append({
+            "activity_type": "top_set",
+            "created_at": log.created_at,
+            "user": UserResponse.model_validate(log.user).model_dump(),
+            "set_review": None,
+            "set_rating": None,
+            "track_review": None,
+            "track_rating": None,
+            "top_track": None,
+            "top_set": {
+                "set": DJSetResponse.model_validate(log.set).model_dump(),
+                "log": LogResponse.model_validate(log).model_dump(),
+                "order": log.top_set_order
+            },
+            "event_created": None,
+            "event_confirmed": None
+        })
+    
+    # Event creation (when users create events)
+    events_query = select(Event)
+    if user_ids:
+        events_query = events_query.where(Event.created_by_id.in_(user_ids))
+    events_query = events_query.order_by(Event.created_at.desc()).limit(limit * 3)
+    events_result = await db.execute(events_query)
+    events = events_result.scalars().all()
+    
+    for event in events:
+        await db.refresh(event, ["created_by"])
+        activities.append({
+            "activity_type": "event_created",
+            "created_at": event.created_at,
+            "user": UserResponse.model_validate(event.created_by).model_dump(),
+            "set_review": None,
+            "set_rating": None,
+            "track_review": None,
+            "track_rating": None,
+            "top_track": None,
+            "top_set": None,
+            "event_created": {
+                "event": EventResponse.model_validate(event).model_dump()
+            },
+            "event_confirmed": None
+        })
+    
+    # Event confirmations (when users confirm they attended events)
+    event_confirmations_query = select(EventConfirmation)
+    if user_ids:
+        event_confirmations_query = event_confirmations_query.where(EventConfirmation.user_id.in_(user_ids))
+    event_confirmations_query = event_confirmations_query.order_by(EventConfirmation.created_at.desc()).limit(limit * 3)
+    event_confirmations_result = await db.execute(event_confirmations_query)
+    event_confirmations = event_confirmations_result.scalars().all()
+    
+    for confirmation in event_confirmations:
+        await db.refresh(confirmation, ["user", "event"])
+        activities.append({
+            "activity_type": "event_confirmed",
+            "created_at": confirmation.created_at,
+            "user": UserResponse.model_validate(confirmation.user).model_dump(),
+            "set_review": None,
+            "set_rating": None,
+            "track_review": None,
+            "track_rating": None,
+            "top_track": None,
+            "top_set": None,
+            "event_created": None,
+            "event_confirmed": {
+                "event": EventResponse.model_validate(confirmation.event).model_dump()
+            }
+        })
+    
+    # Sort all activities by created_at (most recent first)
+    activities.sort(key=lambda x: x["created_at"], reverse=True)
+    
+    # Apply pagination
+    total = len(activities)
+    offset = (page - 1) * limit
+    paginated_activities = activities[offset:offset + limit]
+    
+    pages = (total + limit - 1) // limit if total > 0 else 0
+    
+    # Return as dict for now to debug
+    return {
+        "items": paginated_activities,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": pages
+    }
 
 
 @router.get("/{user_id}/follow-status")
@@ -389,6 +680,139 @@ async def get_user_top_tracks(
     return top_tracks
 
 
+@router.get("/{user_id}/top-events", response_model=list)
+async def get_user_top_events(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get a user's top 5 events (same pattern as top tracks)."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    query = (
+        select(Event, UserTopEvent.order)
+        .join(UserTopEvent, Event.id == UserTopEvent.event_id)
+        .where(UserTopEvent.user_id == user_id)
+        .order_by(UserTopEvent.order.asc())
+        .limit(5)
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    return [
+        {**EventResponse.model_validate(e).model_dump(), "order": order}
+        for e, order in rows
+    ]
+
+
+@router.get("/{user_id}/top-venues", response_model=list)
+async def get_user_top_venues(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get a user's top 5 venues (same pattern as top tracks)."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    query = (
+        select(UserTopVenue)
+        .where(UserTopVenue.user_id == user_id)
+        .order_by(UserTopVenue.order.asc())
+        .limit(5)
+    )
+    result = await db.execute(query)
+    venues = result.scalars().all()
+    return [{"id": str(v.id), "venue_name": v.venue_name, "order": v.order} for v in venues]
+
+
+@router.post("/me/top-events", status_code=status.HTTP_201_CREATED)
+async def add_top_event(
+    event_id: UUID = Query(...),
+    order: int = Query(..., ge=1, le=5),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Add an event to current user's top 5 (same pattern as top tracks)."""
+    result = await db.execute(select(Event).where(Event.id == event_id))
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    # If already at this order or event already in top 5, replace
+    existing = await db.execute(
+        select(UserTopEvent).where(
+            UserTopEvent.user_id == current_user.id,
+            (UserTopEvent.event_id == event_id) | (UserTopEvent.order == order)
+        )
+    )
+    for row in existing.scalars().all():
+        await db.delete(row)
+    db.add(UserTopEvent(user_id=current_user.id, event_id=event_id, order=order))
+    await db.commit()
+    return {"event_id": str(event_id), "order": order}
+
+
+@router.delete("/me/top-events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_top_event(
+    event_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Remove an event from current user's top 5."""
+    result = await db.execute(
+        select(UserTopEvent).where(
+            UserTopEvent.user_id == current_user.id,
+            UserTopEvent.event_id == event_id
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row:
+        await db.delete(row)
+        await db.commit()
+    return None
+
+
+@router.post("/me/top-venues", status_code=status.HTTP_201_CREATED)
+async def add_top_venue(
+    venue_name: str = Query(..., min_length=1, max_length=255),
+    order: int = Query(..., ge=1, le=5),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Add a venue to current user's top 5."""
+    existing = await db.execute(
+        select(UserTopVenue).where(
+            UserTopVenue.user_id == current_user.id,
+            (UserTopVenue.venue_name == venue_name) | (UserTopVenue.order == order)
+        )
+    )
+    for row in existing.scalars().all():
+        await db.delete(row)
+    db.add(UserTopVenue(user_id=current_user.id, venue_name=venue_name.strip(), order=order))
+    await db.commit()
+    return {"venue_name": venue_name.strip(), "order": order}
+
+
+@router.delete("/me/top-venues/{venue_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_top_venue(
+    venue_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Remove a venue from current user's top 5 by UserTopVenue id."""
+    result = await db.execute(
+        select(UserTopVenue).where(
+            UserTopVenue.id == venue_id,
+            UserTopVenue.user_id == current_user.id
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row:
+        await db.delete(row)
+        await db.commit()
+    return None
+
+
 @router.get("/me/friends", response_model=PaginatedResponse)
 async def get_my_friends(
     page: int = Query(1, ge=1),
@@ -452,81 +876,10 @@ async def get_user_feed(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get activity feed from users that the current user follows.
+    Get activity feed from users that the current user follows (friends-only).
     
-    Returns recent activity (reviews, created lists) from followed users.
-    Note: In a production app, you'd want a dedicated activity table for better performance.
+    This is a convenience endpoint that calls activity-feed with friends_only=True.
     """
-    # Get list of followed user IDs
-    following_result = await db.execute(
-        select(Follow.following_id).where(Follow.follower_id == current_user.id)
-    )
-    following_ids = [row[0] for row in following_result.all()]
-    
-    if not following_ids:
-        return PaginatedResponse(
-            items=[],
-            total=0,
-            page=page,
-            limit=limit,
-            pages=0
-        )
-    
-    # Get recent reviews from followed users
-    recent_reviews = await db.execute(
-        select(Review)
-        .where(Review.user_id.in_(following_ids), Review.is_public == True)
-        .order_by(Review.created_at.desc())
-        .limit(limit * 2)
-    )
-    reviews = recent_reviews.scalars().all()
-    
-    # Get recent lists from followed users
-    recent_lists = await db.execute(
-        select(List)
-        .where(List.user_id.in_(following_ids), List.is_public == True)
-        .order_by(List.created_at.desc())
-        .limit(limit * 2)
-    )
-    lists = recent_lists.scalars().all()
-    
-    # Combine and sort by date
-    items = []
-    
-    # Add reviews
-    for review in reviews:
-        await db.refresh(review, ["user", "set"])
-        items.append({
-            "type": "review",
-            "data": review,
-            "created_at": review.created_at
-        })
-    
-    # Add lists
-    for list_obj in lists:
-        await db.refresh(list_obj, ["user"])
-        items.append({
-            "type": "list",
-            "data": list_obj,
-            "created_at": list_obj.created_at
-        })
-    
-    # Sort by created_at
-    items.sort(key=lambda x: x["created_at"], reverse=True)
-    
-    # Apply pagination
-    total = len(items)
-    offset = (page - 1) * limit
-    paginated_items = items[offset:offset + limit]
-    
-    pages = (total + limit - 1) // limit if total > 0 else 0
-    
-    return PaginatedResponse(
-        items=[item["data"] for item in paginated_items],
-        total=total,
-        page=page,
-        limit=limit,
-        pages=pages
-    )
+    return await get_activity_feed(page=page, limit=limit, friends_only=True, current_user=current_user, db=db)
 
 

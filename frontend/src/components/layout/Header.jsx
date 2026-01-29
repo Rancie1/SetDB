@@ -27,7 +27,7 @@ const Header = () => {
           {/* Navigation */}
           <nav className="hidden md:flex space-x-8">
             <Link to="/" className="text-gray-700 hover:text-primary-600 px-3 py-2">
-              Home
+              Discover
             </Link>
             <Link to="/sets" className="text-gray-700 hover:text-primary-600 px-3 py-2">
               Sets
@@ -38,14 +38,6 @@ const Header = () => {
             <Link to="/events" className="text-gray-700 hover:text-primary-600 px-3 py-2">
               Events
             </Link>
-            <Link to="/friends" className="text-gray-700 hover:text-primary-600 px-3 py-2">
-              Friends
-            </Link>
-            {isAuthenticated() && (
-              <Link to="/feed" className="text-gray-700 hover:text-primary-600 px-3 py-2">
-                Feed
-              </Link>
-            )}
           </nav>
 
           {/* User Menu */}

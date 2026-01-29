@@ -9,10 +9,10 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import useAuthStore from './store/authStore';
 
 // Pages
-import HomePage from './pages/HomePage';
+import DiscoverPage from './pages/DiscoverPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import DiscoverPage from './pages/DiscoverPage';
+import SetsPage from './pages/SetsPage';
 import TracksDiscoverPage from './pages/TracksDiscoverPage';
 import EventsPage from './pages/EventsPage';
 import EventDetailsPage from './pages/EventDetailsPage';
@@ -24,6 +24,7 @@ import ManageProfilePage from './pages/ManageProfilePage';
 import SoundCloudCallbackPage from './pages/SoundCloudCallbackPage';
 import SetDetailsPage from './pages/SetDetailsPage';
 import TrackDetailsPage from './pages/TrackDetailsPage';
+import TopListsPage from './pages/TopListsPage';
 
 function App() {
   const { checkAuth } = useAuthStore();
@@ -40,7 +41,7 @@ function App() {
           path="/"
           element={
             <Layout>
-              <HomePage />
+              <DiscoverPage />
             </Layout>
           }
         />
@@ -72,7 +73,7 @@ function App() {
           path="/sets"
           element={
             <Layout>
-              <DiscoverPage />
+              <SetsPage />
             </Layout>
           }
         />
@@ -169,6 +170,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <ManageProfilePage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/lists/:id"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <TopListsPage />
               </Layout>
             </ProtectedRoute>
           }

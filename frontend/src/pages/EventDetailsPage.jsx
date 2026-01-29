@@ -13,6 +13,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import * as eventsService from '../services/eventsService';
 import * as setsService from '../services/setsService';
+import * as usersService from '../services/usersService';
 
 const EventDetailsPage = () => {
   const { id } = useParams();
@@ -31,6 +32,9 @@ const EventDetailsPage = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [selectedSetId, setSelectedSetId] = useState(null);
+  const [isInTop5, setIsInTop5] = useState(false);
+  const [topEventOrder, setTopEventOrder] = useState(null);
+  const [topEventLoading, setTopEventLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -42,8 +46,51 @@ const EventDetailsPage = () => {
   useEffect(() => {
     if (event && isAuthenticated && user) {
       checkConfirmation();
+      checkTopEvent();
     }
   }, [event, isAuthenticated, user]);
+
+  const checkTopEvent = async () => {
+    if (!user || !event) return;
+    try {
+      const res = await usersService.getUserTopEvents(user.id);
+      const list = res.data || [];
+      const found = list.find((e) => e.id === event.id);
+      setIsInTop5(!!found);
+      setTopEventOrder(found ? found.order : null);
+    } catch {
+      setIsInTop5(false);
+      setTopEventOrder(null);
+    }
+  };
+
+  const handleAddToTop5 = async (order) => {
+    if (!event || !isAuthenticated || topEventLoading) return;
+    setTopEventLoading(true);
+    try {
+      await usersService.addTopEvent(event.id, order);
+      setIsInTop5(true);
+      setTopEventOrder(order);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to add to top 5');
+    } finally {
+      setTopEventLoading(false);
+    }
+  };
+
+  const handleRemoveFromTop5 = async () => {
+    if (!event || !isAuthenticated || topEventLoading) return;
+    setTopEventLoading(true);
+    try {
+      await usersService.removeTopEvent(event.id);
+      setIsInTop5(false);
+      setTopEventOrder(null);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to remove from top 5');
+    } finally {
+      setTopEventLoading(false);
+    }
+  };
 
   const loadEvent = async () => {
     setLoading(true);
@@ -290,21 +337,45 @@ const EventDetailsPage = () => {
                   )}
                 </div>
                 {isAuthenticated && (
-                  <button
-                    onClick={handleConfirmEvent}
-                    disabled={confirming}
-                    className={`px-3 py-1 rounded-md text-sm font-medium ${
-                      isConfirmed
-                        ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    } disabled:opacity-50`}
-                  >
-                    {confirming
-                      ? '...'
-                      : isConfirmed
-                      ? '✓ Confirmed'
-                      : 'Confirm Attendance'}
-                  </button>
+                  <>
+                    <button
+                      onClick={handleConfirmEvent}
+                      disabled={confirming}
+                      className={`px-3 py-1 rounded-md text-sm font-medium ${
+                        isConfirmed
+                          ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      } disabled:opacity-50`}
+                    >
+                      {confirming
+                        ? '...'
+                        : isConfirmed
+                        ? '✓ Confirmed'
+                        : 'Confirm Attendance'}
+                    </button>
+                    {isInTop5 ? (
+                      <button
+                        onClick={handleRemoveFromTop5}
+                        disabled={topEventLoading}
+                        className="px-3 py-1 rounded-md text-sm font-medium bg-primary-100 text-primary-800 hover:bg-primary-200 disabled:opacity-50"
+                      >
+                        {topEventLoading ? '...' : `#${topEventOrder} in Top 5 — Remove`}
+                      </button>
+                    ) : (
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((order) => (
+                          <button
+                            key={order}
+                            onClick={() => handleAddToTop5(order)}
+                            disabled={topEventLoading}
+                            className="px-2 py-1 rounded text-xs font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
+                          >
+                            #{order}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               {event.confirmation_count > 0 && (

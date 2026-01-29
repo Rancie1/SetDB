@@ -14,10 +14,14 @@ Why separate schemas?
 """
 
 from datetime import datetime, date
-from typing import Optional, List, Any
+from typing import Optional, List, Any, TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
+
+if TYPE_CHECKING:
+    # Forward references for types defined later in this file
+    pass
 
 
 # Base schemas with common fields
@@ -397,7 +401,9 @@ class ListCreate(BaseSchema):
     """Schema for creating a list."""
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
+    list_type: str = Field(..., pattern="^(sets|events|venues|tracks)$", description="Type of list: sets, events, venues, or tracks")
     is_public: bool = True
+    max_items: Optional[int] = Field(None, ge=1, le=100, description="Maximum number of items (default 5 for top 5 lists)")
 
 
 class ListUpdate(BaseSchema):
@@ -405,12 +411,17 @@ class ListUpdate(BaseSchema):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     is_public: Optional[bool] = None
+    max_items: Optional[int] = Field(None, ge=1, le=100)
 
 
 class ListItemCreate(BaseSchema):
-    """Schema for adding a set to a list."""
-    set_id: UUID
-    position: Optional[int] = None  # If None, append to end
+    """Schema for adding an item to a list (polymorphic)."""
+    # One of these must be provided based on list type
+    set_id: Optional[UUID] = None
+    event_id: Optional[UUID] = None
+    track_id: Optional[UUID] = None
+    venue_name: Optional[str] = Field(None, max_length=255)
+    position: Optional[int] = Field(None, ge=1)  # If None, append to end
     notes: Optional[str] = None
 
 
@@ -421,14 +432,21 @@ class ListItemUpdate(BaseSchema):
 
 
 class ListItemResponse(BaseSchema):
-    """Schema for list item response."""
+    """Schema for list item response (polymorphic)."""
     id: UUID
     list_id: UUID
-    set_id: UUID
+    set_id: Optional[UUID] = None
+    event_id: Optional[UUID] = None
+    track_id: Optional[UUID] = None
+    venue_name: Optional[str] = None
     position: int
     notes: Optional[str] = None
     created_at: datetime
-    set: Optional[DJSetResponse] = None
+    # Item data (one will be populated based on type)
+    # Using string literals for forward references since these classes are defined later
+    set: Optional["DJSetResponse"] = None
+    event: Optional["EventResponse"] = None
+    track: Optional["TrackResponse"] = None
 
 
 class ListResponse(BaseSchema):
@@ -437,8 +455,10 @@ class ListResponse(BaseSchema):
     user_id: UUID
     name: str
     description: Optional[str] = None
+    list_type: str
     is_public: bool
     is_featured: bool
+    max_items: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     user: Optional[UserResponse] = None
@@ -506,6 +526,27 @@ class PaginatedResponse(BaseModel):
 
 
 # ============================================================================
+# ACTIVITY FEED SCHEMAS
+# ============================================================================
+
+class ActivityItem(BaseSchema):
+    """Schema for activity feed items."""
+    activity_type: str  # "set_review", "set_rating", "track_review", "track_rating", "top_track", "top_set", "event_created", "event_confirmed"
+    created_at: datetime
+    user: UserResponse
+    
+    # Activity-specific data (one of these will be populated based on activity_type)
+    set_review: Optional[ReviewResponse] = None
+    set_rating: Optional[RatingResponse] = None
+    track_review: Optional[TrackReviewResponse] = None
+    track_rating: Optional[TrackRatingResponse] = None
+    top_track: Optional[dict] = None  # {track: TrackResponse, order: int}
+    top_set: Optional[dict] = None  # {set: DJSetResponse, log: LogResponse, order: int}
+    event_created: Optional[dict] = None  # {event: EventResponse}
+    event_confirmed: Optional[dict] = None  # {event: EventResponse}
+
+
+# ============================================================================
 # IMPORT SCHEMAS
 # ============================================================================
 
@@ -551,6 +592,11 @@ class EventUpdate(BaseSchema):
 class EventResponse(EventBase):
     """Schema for event response."""
     id: UUID
+
+
+# Update forward references after all classes are defined
+if not TYPE_CHECKING:
+    ListItemResponse.model_rebuild()
     is_verified: bool = False
     confirmation_count: int = 0
     created_at: datetime

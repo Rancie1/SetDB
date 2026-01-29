@@ -26,6 +26,14 @@ class SourceType(str, enum.Enum):
     LIVE = "live"
 
 
+class ListType(str, enum.Enum):
+    """Enum for list types/categories."""
+    SETS = "sets"
+    EVENTS = "events"
+    VENUES = "venues"
+    TRACKS = "tracks"
+
+
 class User(Base):
     """
     User model - stores user accounts and profiles.
@@ -87,6 +95,8 @@ class User(Base):
     track_ratings: Mapped["_List[TrackRating]"] = relationship("TrackRating", back_populates="user", cascade="all, delete-orphan")
     track_reviews: Mapped["_List[TrackReview]"] = relationship("TrackReview", back_populates="user", cascade="all, delete-orphan")
     top_tracks: Mapped["_List[UserTopTrack]"] = relationship("UserTopTrack", back_populates="user", cascade="all, delete-orphan")
+    top_events: Mapped["_List[UserTopEvent]"] = relationship("UserTopEvent", back_populates="user", cascade="all, delete-orphan")
+    top_venues: Mapped["_List[UserTopVenue]"] = relationship("UserTopVenue", back_populates="user", cascade="all, delete-orphan")
 
 
 class DJSet(Base):
@@ -141,6 +151,7 @@ class DJSet(Base):
     # Relationships for track tags
     track_tags: Mapped["_List[SetTrack]"] = relationship("SetTrack", back_populates="set", cascade="all, delete-orphan")
     track_links: Mapped["_List[TrackSetLink]"] = relationship("TrackSetLink", back_populates="set", cascade="all, delete-orphan")
+    list_items: Mapped["_List[ListItem]"] = relationship("ListItem", back_populates="set", cascade="all, delete-orphan", foreign_keys="ListItem.set_id")
     
     # Unique constraint: prevent duplicate sets from same source
     __table_args__ = (
@@ -236,6 +247,7 @@ class Track(Base):
     ratings: Mapped["_List[TrackRating]"] = relationship("TrackRating", back_populates="track", cascade="all, delete-orphan")
     reviews: Mapped["_List[TrackReview]"] = relationship("TrackReview", back_populates="track", cascade="all, delete-orphan")
     user_top_tracks: Mapped["_List[UserTopTrack]"] = relationship("UserTopTrack", back_populates="track", cascade="all, delete-orphan")
+    list_items: Mapped["_List[ListItem]"] = relationship("ListItem", back_populates="track", cascade="all, delete-orphan", foreign_keys="ListItem.track_id")
 
 
 class TrackSetLink(Base):
@@ -437,6 +449,49 @@ class UserTopTrack(Base):
     )
 
 
+class UserTopEvent(Base):
+    """
+    User Top Event - users can mark up to 5 events as their favorites (same pattern as top tracks/sets).
+    """
+    __tablename__ = "user_top_events"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    event_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("events.id"), nullable=False, index=True)
+    order: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-5
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    user: Mapped["User"] = relationship("User", back_populates="top_events")
+    event: Mapped["Event"] = relationship("Event", back_populates="user_top_events")
+    
+    __table_args__ = (
+        UniqueConstraint('user_id', 'event_id', name='uq_user_top_event'),
+        UniqueConstraint('user_id', 'order', name='uq_user_top_event_order'),
+    )
+
+
+class UserTopVenue(Base):
+    """
+    User Top Venue - users can name up to 5 favorite venues (same pattern as top tracks; venue is free text).
+    """
+    __tablename__ = "user_top_venues"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    venue_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    order: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-5
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    user: Mapped["User"] = relationship("User", back_populates="top_venues")
+    
+    __table_args__ = (
+        UniqueConstraint('user_id', 'venue_name', name='uq_user_top_venue'),
+        UniqueConstraint('user_id', 'order', name='uq_user_top_venue_order'),
+    )
+
+
 class TrackRating(Base):
     """
     Track Rating model - stores user ratings for individual tracks.
@@ -504,9 +559,10 @@ class TrackReview(Base):
 
 class List(Base):
     """
-    List model - user-created lists (e.g., "Best Techno Sets 2024").
+    List model - user-created lists (e.g., "Best Techno Sets 2024", "Top 5 Venues").
     
-    Users can create lists to organize sets. Lists can be public or private.
+    Users can create lists to organize sets, events, venues, tracks, etc.
+    Lists can be public or private and have a maximum of 5 items for "top 5" lists.
     """
     __tablename__ = "lists"
     
@@ -518,8 +574,10 @@ class List(Base):
     # List information
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    list_type: Mapped[ListType] = mapped_column(Enum(ListType, native_enum=False), nullable=False, default=ListType.SETS, index=True)
     is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    max_items: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=5)  # For top 5 lists
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
@@ -532,10 +590,10 @@ class List(Base):
 
 class ListItem(Base):
     """
-    List Item model - sets included in lists.
+    List Item model - items included in lists (polymorphic).
     
-    This is a many-to-many relationship between lists and sets.
-    The position field allows ordered lists.
+    Supports different item types: sets, events, venues (as strings), tracks.
+    The position field allows ordered lists (1-5 for top 5 lists).
     """
     __tablename__ = "list_items"
     
@@ -543,7 +601,12 @@ class ListItem(Base):
     
     # Foreign keys
     list_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("lists.id"), nullable=False, index=True)
-    set_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dj_sets.id"), nullable=False, index=True)
+    
+    # Polymorphic foreign keys - one of these will be set based on list type
+    set_id: Mapped[Optional[UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("dj_sets.id"), nullable=True, index=True)
+    event_id: Mapped[Optional[UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("events.id"), nullable=True, index=True)
+    track_id: Mapped[Optional[UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("tracks.id"), nullable=True, index=True)
+    venue_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # For venue lists (stored as string)
     
     # Item information
     position: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
@@ -554,11 +617,20 @@ class ListItem(Base):
     
     # Relationships
     list: Mapped["List"] = relationship("List", back_populates="items")
-    set: Mapped["DJSet"] = relationship("DJSet", back_populates="list_items")
+    set: Mapped[Optional["DJSet"]] = relationship("DJSet", back_populates="list_items", foreign_keys=[set_id])
+    event: Mapped[Optional["Event"]] = relationship("Event", foreign_keys=[event_id])
+    track: Mapped[Optional["Track"]] = relationship("Track", foreign_keys=[track_id])
     
-    # Unique constraint: prevent duplicates in same list
+    # Unique constraints: prevent duplicates in same list for each type
     __table_args__ = (
         UniqueConstraint('list_id', 'set_id', name='uq_list_set_item'),
+        UniqueConstraint('list_id', 'event_id', name='uq_list_event_item'),
+        UniqueConstraint('list_id', 'track_id', name='uq_list_track_item'),
+        UniqueConstraint('list_id', 'venue_name', name='uq_list_venue_item'),
+        CheckConstraint(
+            '(set_id IS NOT NULL)::int + (event_id IS NOT NULL)::int + (track_id IS NOT NULL)::int + (venue_name IS NOT NULL)::int = 1',
+            name='check_exactly_one_item_type'
+        ),
     )
 
 
@@ -630,6 +702,8 @@ class Event(Base):
     created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id], back_populates="created_events")
     linked_sets: Mapped["_List[EventSet]"] = relationship("EventSet", foreign_keys="EventSet.event_id", back_populates="event", cascade="all, delete-orphan")
     confirmations: Mapped["_List[EventConfirmation]"] = relationship("EventConfirmation", back_populates="event", cascade="all, delete-orphan")
+    list_items: Mapped["_List[ListItem]"] = relationship("ListItem", back_populates="event", cascade="all, delete-orphan", foreign_keys="ListItem.event_id")
+    user_top_events: Mapped["_List[UserTopEvent]"] = relationship("UserTopEvent", back_populates="event", cascade="all, delete-orphan")
 
 
 class EventSet(Base):

@@ -11,7 +11,7 @@ from sqlalchemy import select, func
 from uuid import UUID
 
 from app.database import get_db
-from app.models import List, ListItem, User, DJSet
+from app.models import List, ListItem, User, DJSet, Event, Track, ListType
 from app.schemas import (
     ListCreate,
     ListUpdate,
@@ -19,7 +19,11 @@ from app.schemas import (
     ListItemCreate,
     ListItemUpdate,
     ListItemResponse,
-    PaginatedResponse
+    PaginatedResponse,
+    UserResponse,
+    DJSetResponse,
+    EventResponse,
+    TrackResponse
 )
 from app.auth import get_current_active_user
 from app.core.exceptions import DuplicateEntryError
@@ -64,15 +68,31 @@ async def get_lists(
     result = await db.execute(query)
     lists = result.scalars().all()
     
-    # Load user relationships
+    # Eager load user and items, then build serializable response (avoid lazy load + ORM in response)
+    list_responses = []
     for list_obj in lists:
-        await db.refresh(list_obj, ["user"])
+        await db.refresh(list_obj, ["user", "items"])
+        list_type_val = list_obj.list_type.value if hasattr(list_obj.list_type, "value") else str(list_obj.list_type)
+        list_responses.append({
+            "id": list_obj.id,
+            "user_id": list_obj.user_id,
+            "name": list_obj.name,
+            "description": list_obj.description,
+            "list_type": list_type_val,
+            "is_public": list_obj.is_public,
+            "is_featured": list_obj.is_featured,
+            "max_items": list_obj.max_items,
+            "created_at": list_obj.created_at,
+            "updated_at": list_obj.updated_at,
+            "user": UserResponse.model_validate(list_obj.user).model_dump() if list_obj.user else None,
+            "items": [],  # Omit items in list index to keep payload small
+        })
     
     # Calculate pages
     pages = (total + limit - 1) // limit if total > 0 else 0
     
     return PaginatedResponse(
-        items=list(lists),
+        items=list_responses,
         total=total,
         page=page,
         limit=limit,
@@ -87,17 +107,28 @@ async def create_list(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new list."""
+    # Validate list_type
+    try:
+        list_type_enum = ListType(list_data.list_type)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid list_type: {list_data.list_type}. Must be one of: sets, events, venues, tracks"
+        )
+    
     new_list = List(
         user_id=current_user.id,
         name=list_data.name,
         description=list_data.description,
-        is_public=list_data.is_public
+        list_type=list_type_enum,
+        is_public=list_data.is_public,
+        max_items=list_data.max_items or 5  # Default to 5 for top 5 lists
     )
     
     db.add(new_list)
     await db.commit()
     await db.refresh(new_list)
-    await db.refresh(new_list, ["user"])
+    await db.refresh(new_list, ["user", "items"])  # Eager load items (empty) to avoid lazy load in response
     
     return new_list
 
@@ -120,11 +151,32 @@ async def get_list(
     # Load relationships
     await db.refresh(list_obj, ["user", "items"])
     
-    # Load set information for each item
+    # Load item information based on list type and convert to response format
+    items_data = []
     for item in list_obj.items:
-        await db.refresh(item, ["set"])
+        item_dict = ListItemResponse.model_validate(item).model_dump()
+        
+        if list_obj.list_type == ListType.SETS:
+            await db.refresh(item, ["set"])
+            if item.set:
+                item_dict["set"] = DJSetResponse.model_validate(item.set).model_dump()
+        elif list_obj.list_type == ListType.EVENTS:
+            await db.refresh(item, ["event"])
+            if item.event:
+                item_dict["event"] = EventResponse.model_validate(item.event).model_dump()
+        elif list_obj.list_type == ListType.TRACKS:
+            await db.refresh(item, ["track"])
+            if item.track:
+                item_dict["track"] = TrackResponse.model_validate(item.track).model_dump()
+        # Venues don't need relationship loading (stored as string)
+        
+        items_data.append(item_dict)
     
-    return list_obj
+    # Convert list to response and add items
+    list_dict = ListResponse.model_validate(list_obj).model_dump()
+    list_dict["items"] = items_data
+    
+    return list_dict
 
 
 @router.put("/{list_id}", response_model=ListResponse)
@@ -158,6 +210,8 @@ async def update_list(
         list_obj.description = list_update.description
     if list_update.is_public is not None:
         list_obj.is_public = list_update.is_public
+    if list_update.max_items is not None:
+        list_obj.max_items = list_update.max_items
     
     await db.commit()
     await db.refresh(list_obj)
@@ -196,13 +250,13 @@ async def delete_list(
 
 
 @router.post("/{list_id}/items", response_model=ListItemResponse, status_code=status.HTTP_201_CREATED)
-async def add_set_to_list(
+async def add_item_to_list(
     list_id: UUID,
     item_data: ListItemCreate,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Add a set to a list."""
+    """Add an item to a list (polymorphic - supports sets, events, tracks, venues)."""
     # Check if list exists and user owns it
     result = await db.execute(select(List).where(List.id == list_id))
     list_obj = result.scalar_one_or_none()
@@ -219,25 +273,112 @@ async def add_set_to_list(
             detail="Not authorized to add items to this list"
         )
     
-    # Check if set exists
-    set_result = await db.execute(select(DJSet).where(DJSet.id == item_data.set_id))
-    set_obj = set_result.scalar_one_or_none()
-    
-    if not set_obj:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Set with ID {item_data.set_id} not found"
-        )
-    
-    # Check if set already in list
-    existing = await db.execute(
-        select(ListItem).where(
-            ListItem.list_id == list_id,
-            ListItem.set_id == item_data.set_id
-        )
+    # Check max items limit
+    current_count_result = await db.execute(
+        select(func.count(ListItem.id)).where(ListItem.list_id == list_id)
     )
-    if existing.scalar_one_or_none():
-        raise DuplicateEntryError("Set already in this list")
+    current_count = current_count_result.scalar() or 0
+    max_items = list_obj.max_items or 5
+    
+    if current_count >= max_items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"List already has {current_count} items (maximum: {max_items})"
+        )
+    
+    # Validate item type matches list type and item exists
+    item_id = None
+    item_type = None
+    
+    if list_obj.list_type == ListType.SETS:
+        if not item_data.set_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="set_id is required for sets lists"
+            )
+        set_result = await db.execute(select(DJSet).where(DJSet.id == item_data.set_id))
+        if not set_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Set with ID {item_data.set_id} not found"
+            )
+        item_id = item_data.set_id
+        item_type = "set"
+        # Check if already in list
+        existing = await db.execute(
+            select(ListItem).where(
+                ListItem.list_id == list_id,
+                ListItem.set_id == item_data.set_id
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise DuplicateEntryError("Set already in this list")
+    
+    elif list_obj.list_type == ListType.EVENTS:
+        if not item_data.event_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="event_id is required for events lists"
+            )
+        event_result = await db.execute(select(Event).where(Event.id == item_data.event_id))
+        if not event_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Event with ID {item_data.event_id} not found"
+            )
+        item_id = item_data.event_id
+        item_type = "event"
+        # Check if already in list
+        existing = await db.execute(
+            select(ListItem).where(
+                ListItem.list_id == list_id,
+                ListItem.event_id == item_data.event_id
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise DuplicateEntryError("Event already in this list")
+    
+    elif list_obj.list_type == ListType.TRACKS:
+        if not item_data.track_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="track_id is required for tracks lists"
+            )
+        track_result = await db.execute(select(Track).where(Track.id == item_data.track_id))
+        if not track_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Track with ID {item_data.track_id} not found"
+            )
+        item_id = item_data.track_id
+        item_type = "track"
+        # Check if already in list
+        existing = await db.execute(
+            select(ListItem).where(
+                ListItem.list_id == list_id,
+                ListItem.track_id == item_data.track_id
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise DuplicateEntryError("Track already in this list")
+    
+    elif list_obj.list_type == ListType.VENUES:
+        if not item_data.venue_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="venue_name is required for venues lists"
+            )
+        item_id = item_data.venue_name
+        item_type = "venue"
+        # Check if already in list
+        existing = await db.execute(
+            select(ListItem).where(
+                ListItem.list_id == list_id,
+                ListItem.venue_name == item_data.venue_name
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise DuplicateEntryError("Venue already in this list")
     
     # Determine position (append to end if not specified)
     if item_data.position is None:
@@ -249,10 +390,13 @@ async def add_set_to_list(
     else:
         position = item_data.position
     
-    # Create list item
+    # Create list item based on type
     new_item = ListItem(
         list_id=list_id,
-        set_id=item_data.set_id,
+        set_id=item_data.set_id if list_obj.list_type == ListType.SETS else None,
+        event_id=item_data.event_id if list_obj.list_type == ListType.EVENTS else None,
+        track_id=item_data.track_id if list_obj.list_type == ListType.TRACKS else None,
+        venue_name=item_data.venue_name if list_obj.list_type == ListType.VENUES else None,
         position=position,
         notes=item_data.notes
     )
@@ -260,9 +404,24 @@ async def add_set_to_list(
     db.add(new_item)
     await db.commit()
     await db.refresh(new_item)
-    await db.refresh(new_item, ["set"])
     
-    return new_item
+    # Load appropriate relationship based on type and convert to response
+    item_dict = ListItemResponse.model_validate(new_item).model_dump()
+    
+    if list_obj.list_type == ListType.SETS:
+        await db.refresh(new_item, ["set"])
+        if new_item.set:
+            item_dict["set"] = DJSetResponse.model_validate(new_item.set).model_dump()
+    elif list_obj.list_type == ListType.EVENTS:
+        await db.refresh(new_item, ["event"])
+        if new_item.event:
+            item_dict["event"] = EventResponse.model_validate(new_item.event).model_dump()
+    elif list_obj.list_type == ListType.TRACKS:
+        await db.refresh(new_item, ["track"])
+        if new_item.track:
+            item_dict["track"] = TrackResponse.model_validate(new_item.track).model_dump()
+    
+    return item_dict
 
 
 @router.put("/{list_id}/items/{item_id}", response_model=ListItemResponse)
@@ -308,9 +467,25 @@ async def update_list_item(
     
     await db.commit()
     await db.refresh(item)
-    await db.refresh(item, ["set"])
     
-    return item
+    # Load appropriate relationship based on list type and convert to response
+    await db.refresh(list_obj, ["list_type"])
+    item_dict = ListItemResponse.model_validate(item).model_dump()
+    
+    if list_obj.list_type == ListType.SETS:
+        await db.refresh(item, ["set"])
+        if item.set:
+            item_dict["set"] = DJSetResponse.model_validate(item.set).model_dump()
+    elif list_obj.list_type == ListType.EVENTS:
+        await db.refresh(item, ["event"])
+        if item.event:
+            item_dict["event"] = EventResponse.model_validate(item.event).model_dump()
+    elif list_obj.list_type == ListType.TRACKS:
+        await db.refresh(item, ["track"])
+        if item.track:
+            item_dict["track"] = TrackResponse.model_validate(item.track).model_dump()
+    
+    return item_dict
 
 
 @router.delete("/{list_id}/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

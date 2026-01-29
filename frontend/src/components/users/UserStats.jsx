@@ -4,7 +4,11 @@
  * Displays user statistics like sets logged, reviews written, etc.
  */
 
-const UserStats = ({ stats, loading }) => {
+import { Link } from 'react-router-dom';
+import useAuthStore from '../../store/authStore';
+
+const UserStats = ({ stats, loading, userId, isOwnProfile }) => {
+  const { user: currentUser } = useAuthStore();
   if (loading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -78,11 +82,8 @@ const UserStats = ({ stats, loading }) => {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {statItems.map((item, index) => (
-        <div
-          key={index}
-          className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
-        >
+      {statItems.map((item, index) => {
+        const StatContent = (
           <div className="flex items-center space-x-3">
             <span className="text-2xl">{item.icon}</span>
             <div>
@@ -90,8 +91,30 @@ const UserStats = ({ stats, loading }) => {
               <div className="text-sm text-gray-600">{item.label}</div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+
+        // Make Friends stat clickable for own profile
+        if (item.label === 'Friends' && isOwnProfile) {
+          return (
+            <Link
+              key={index}
+              to="/friends"
+              className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-primary-300 transition-all cursor-pointer"
+            >
+              {StatContent}
+            </Link>
+          );
+        }
+
+        return (
+          <div
+            key={index}
+            className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
+          >
+            {StatContent}
+          </div>
+        );
+      })}
     </div>
   );
 };

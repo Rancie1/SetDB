@@ -58,4 +58,38 @@ export const getUserTopTracks = async (userId) => {
   return api.get(`/users/${userId}/top-tracks`);
 };
 
+export const getUserTopEvents = async (userId) => {
+  return api.get(`/users/${userId}/top-events`);
+};
+
+export const getUserTopVenues = async (userId) => {
+  return api.get(`/users/${userId}/top-venues`);
+};
+
+export const addTopEvent = async (eventId, order) => {
+  return api.post('/users/me/top-events', null, {
+    params: { event_id: eventId, order },
+  });
+};
+
+export const removeTopEvent = async (eventId) => {
+  return api.delete(`/users/me/top-events/${eventId}`);
+};
+
+export const addTopVenue = async (venueName, order) => {
+  return api.post('/users/me/top-venues', null, {
+    params: { venue_name: venueName, order },
+  });
+};
+
+export const removeTopVenue = async (venueId) => {
+  return api.delete(`/users/me/top-venues/${venueId}`);
+};
+
+export const getActivityFeed = async (page = 1, limit = 20, friendsOnly = false) => {
+  return api.get('/users/activity-feed', {
+    params: { page, limit, friends_only: friendsOnly },
+  });
+};
+
 

@@ -1,97 +1,118 @@
 /**
  * Discover page component.
  * 
- * Allows users to import and browse DJ sets from YouTube and SoundCloud.
+ * Shows activity feed with reviews, ratings, and top track/set additions.
+ * Can filter between public feed (all users) and friends-only feed.
  */
 
 import { useEffect, useState } from 'react';
-import useSetsStore from '../store/setsStore';
-import SetImportForm from '../components/sets/SetImportForm';
-import SetList from '../components/sets/SetList';
+import { Link } from 'react-router-dom';
+import ActivityFeed from '../components/feed/ActivityFeed';
+import * as usersService from '../services/usersService';
+import useAuthStore from '../store/authStore';
 
 const DiscoverPage = () => {
-  const { sets, loading, error, fetchSets, filters, pagination } = useSetsStore();
-  const [searchQuery, setSearchQuery] = useState('');
+  const { isAuthenticated } = useAuthStore();
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [friendsOnly, setFriendsOnly] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    pages: 0,
+  });
 
   useEffect(() => {
-    // Load sets on mount
-    fetchSets();
-  }, []);
+    loadActivities();
+  }, [friendsOnly]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    fetchSets({ search: searchQuery }, 1, 20);
+  const loadActivities = async (page = 1) => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Only allow friends-only if user is authenticated
+      const friendsOnlyFilter = isAuthenticated() && friendsOnly;
+      const response = await usersService.getActivityFeed(page, pagination.limit, friendsOnlyFilter);
+      const { items, total, pages } = response.data;
+      setActivities(items || []);
+      setPagination({
+        ...pagination,
+        page,
+        total,
+        pages,
+      });
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to load activity feed');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleImportSuccess = () => {
-    // Sets will be refreshed automatically by the store
+  const handlePageChange = (newPage) => {
+    loadActivities(newPage);
+  };
+
+  const handleFilterChange = (newFriendsOnly) => {
+    setFriendsOnly(newFriendsOnly);
+    setPagination({
+      ...pagination,
+      page: 1,
+    });
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Sets</h1>
+        <h1 className="text-3xl font-bold mb-2">Discover</h1>
         <p className="text-gray-600">
-          Browse and discover sets from YouTube and SoundCloud.
+          See what your friends and the community are reviewing, rating, and adding to their top 5.
         </p>
       </div>
 
-      {/* Set Import Form */}
-      <div className="mb-6">
-        <SetImportForm onSuccess={handleImportSuccess} />
-      </div>
-
-      {/* Search Bar */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <form onSubmit={handleSearch} className="flex gap-4">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search sets by title or DJ name..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          />
+      {/* Filter Tabs */}
+      {isAuthenticated() && (
+        <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-1 flex">
           <button
-            type="submit"
-            className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-2 rounded-md"
+            onClick={() => handleFilterChange(false)}
+            className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+              !friendsOnly
+                ? 'bg-primary-600 text-white'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
           >
-            Search
+            Public Feed
           </button>
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery('');
-                fetchSets({ search: '' }, 1, 20);
-              }}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2 rounded-md"
-            >
-              Clear
-            </button>
-          )}
-        </form>
-      </div>
-
-      {/* Sets List */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">
-            {searchQuery ? `Search Results` : 'All Sets'}
-          </h2>
-          {pagination.total > 0 && (
-            <p className="text-sm text-gray-600">
-              Showing {sets.length} of {pagination.total} sets
-            </p>
-          )}
-        </div>
-        <SetList sets={sets} loading={loading} error={error} />
-      </div>
-
-      {/* Pagination (if needed) */}
-      {pagination.pages > 1 && (
-        <div className="flex items-center justify-center space-x-2">
           <button
-            onClick={() => fetchSets(filters, pagination.page - 1, pagination.limit)}
+            onClick={() => handleFilterChange(true)}
+            className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+              friendsOnly
+                ? 'bg-primary-600 text-white'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            Friends Only
+          </button>
+        </div>
+      )}
+
+      {!isAuthenticated() && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-blue-800 text-sm">
+            <Link to="/login" className="font-medium hover:underline">Sign in</Link> to see activity from your friends.
+          </p>
+        </div>
+      )}
+
+      {/* Activity Feed */}
+      <ActivityFeed activities={activities} loading={loading} error={error} />
+
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="mt-6 flex items-center justify-center space-x-2">
+          <button
+            onClick={() => handlePageChange(pagination.page - 1)}
             disabled={pagination.page === 1}
             className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
           >
@@ -101,7 +122,7 @@ const DiscoverPage = () => {
             Page {pagination.page} of {pagination.pages}
           </span>
           <button
-            onClick={() => fetchSets(filters, pagination.page + 1, pagination.limit)}
+            onClick={() => handlePageChange(pagination.page + 1)}
             disabled={pagination.page >= pagination.pages}
             className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
           >

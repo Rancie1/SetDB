@@ -14,6 +14,8 @@ import UserStats from './UserStats';
 import SetCard from '../sets/SetCard';
 import TopSets from './TopSets';
 import TopTracks from './TopTracks';
+import TopEvents from './TopEvents';
+import TopVenues from './TopVenues';
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -264,12 +266,20 @@ const UserProfile = () => {
             </button>
           )}
           {isOwnProfile && (
-            <Link
-              to="/profile/manage"
-              className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium"
-            >
-              Manage Profile
-            </Link>
+            <div className="flex space-x-3">
+              <Link
+                to="/friends"
+                className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md font-medium"
+              >
+                Friends
+              </Link>
+              <Link
+                to="/profile/manage"
+                className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium"
+              >
+                Manage Profile
+              </Link>
+            </div>
           )}
         </div>
       </div>
@@ -277,7 +287,7 @@ const UserProfile = () => {
       {/* Stats */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold mb-4">Statistics</h2>
-        <UserStats stats={stats} loading={loading} />
+        <UserStats stats={stats} loading={loading} userId={id} isOwnProfile={isOwnProfile} />
       </div>
 
       {/* Top Sets */}
@@ -298,6 +308,16 @@ const UserProfile = () => {
         <TopTracks userId={id} isOwnProfile={isOwnProfile} />
       </div>
 
+      {/* Top Events */}
+      <div className="mb-6">
+        <TopEvents userId={id} isOwnProfile={isOwnProfile} />
+      </div>
+
+      {/* Top Venues */}
+      <div className="mb-6">
+        <TopVenues userId={id} isOwnProfile={isOwnProfile} />
+      </div>
+
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="border-b border-gray-200">
@@ -308,7 +328,6 @@ const UserProfile = () => {
               { id: 'live-sets', label: 'Live Sets Seen' },
               { id: 'events', label: 'Events Attended' },
               { id: 'reviews', label: 'Reviews' },
-              { id: 'lists', label: 'Lists' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -470,11 +489,6 @@ const UserProfile = () => {
           {activeTab === 'reviews' && (
             <div>
               <p className="text-gray-600">Reviews will appear here...</p>
-            </div>
-          )}
-          {activeTab === 'lists' && (
-            <div>
-              <p className="text-gray-600">Lists will appear here...</p>
             </div>
           )}
         </div>
