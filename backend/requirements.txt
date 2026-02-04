@@ -1,6 +1,7 @@
 # FastAPI and server
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+gunicorn==21.2.0  # Production WSGI server with Uvicorn workers
 
 # Database
 sqlalchemy==2.0.23

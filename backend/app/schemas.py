@@ -592,16 +592,43 @@ class EventUpdate(BaseSchema):
 class EventResponse(EventBase):
     """Schema for event response."""
     id: UUID
-
-
-# Update forward references after all classes are defined
-if not TYPE_CHECKING:
-    ListItemResponse.model_rebuild()
     is_verified: bool = False
     confirmation_count: int = 0
     created_at: datetime
     updated_at: datetime
     created_by_id: UUID
+
+
+# ============================================================================
+# VENUE SCHEMAS
+# ============================================================================
+
+class VenueBase(BaseSchema):
+    """Base venue schema."""
+    name: str = Field(..., min_length=1, max_length=255)
+    location: Optional[str] = Field(None, max_length=500)
+
+
+class VenueCreate(VenueBase):
+    """Schema for creating a venue."""
+    pass
+
+
+class VenueUpdate(BaseSchema):
+    """Schema for updating a venue."""
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    location: Optional[str] = Field(None, max_length=500)
+
+
+class VenueResponse(VenueBase):
+    """Schema for venue response."""
+    id: UUID
+    created_at: datetime
+
+
+# Update forward references after all classes are defined
+if not TYPE_CHECKING:
+    ListItemResponse.model_rebuild()
 
 
 class CreateLiveEventFromSetRequest(BaseSchema):

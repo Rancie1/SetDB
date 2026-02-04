@@ -11,8 +11,8 @@ from uuid import UUID
 from typing import Optional
 
 from app.database import get_db
-from app.models import User, Follow, UserSetLog, Review, List, Rating, DJSet, EventConfirmation, Event, SetTrack, Track, UserTopTrack, UserTopEvent, UserTopVenue, TrackReview, TrackRating
-from app.schemas import UserResponse, UserUpdate, UserStats, PaginatedResponse, SetTrackResponse, TrackResponse, ActivityItem, ReviewResponse, RatingResponse, TrackReviewResponse, TrackRatingResponse, DJSetResponse, LogResponse, EventResponse
+from app.models import User, Follow, UserSetLog, Review, List, Rating, DJSet, EventConfirmation, Event, SetTrack, Track, UserTopTrack, UserTopEvent, UserTopVenue, Venue, TrackReview, TrackRating
+from app.schemas import UserResponse, UserUpdate, UserStats, PaginatedResponse, SetTrackResponse, TrackResponse, ActivityItem, ReviewResponse, RatingResponse, TrackReviewResponse, TrackRatingResponse, DJSetResponse, LogResponse, EventResponse, VenueResponse
 from app.auth import get_current_active_user
 from fastapi import Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -716,14 +716,18 @@ async def get_user_top_venues(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     query = (
-        select(UserTopVenue)
+        select(Venue, UserTopVenue.order, UserTopVenue.id.label("user_top_venue_id"))
+        .join(UserTopVenue, Venue.id == UserTopVenue.venue_id)
         .where(UserTopVenue.user_id == user_id)
         .order_by(UserTopVenue.order.asc())
         .limit(5)
     )
     result = await db.execute(query)
-    venues = result.scalars().all()
-    return [{"id": str(v.id), "venue_name": v.venue_name, "order": v.order} for v in venues]
+    rows = result.all()
+    return [
+        {**VenueResponse.model_validate(venue).model_dump(), "order": order, "id": str(user_top_venue_id)}
+        for venue, order, user_top_venue_id in rows
+    ]
 
 
 @router.post("/me/top-events", status_code=status.HTTP_201_CREATED)
@@ -774,23 +778,27 @@ async def remove_top_event(
 
 @router.post("/me/top-venues", status_code=status.HTTP_201_CREATED)
 async def add_top_venue(
-    venue_name: str = Query(..., min_length=1, max_length=255),
+    venue_id: UUID = Query(..., description="Venue UUID from /api/venues"),
     order: int = Query(..., ge=1, le=5),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Add a venue to current user's top 5."""
+    result = await db.execute(select(Venue).where(Venue.id == venue_id))
+    venue = result.scalar_one_or_none()
+    if not venue:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venue not found")
     existing = await db.execute(
         select(UserTopVenue).where(
             UserTopVenue.user_id == current_user.id,
-            (UserTopVenue.venue_name == venue_name) | (UserTopVenue.order == order)
+            (UserTopVenue.venue_id == venue_id) | (UserTopVenue.order == order)
         )
     )
     for row in existing.scalars().all():
         await db.delete(row)
-    db.add(UserTopVenue(user_id=current_user.id, venue_name=venue_name.strip(), order=order))
+    db.add(UserTopVenue(user_id=current_user.id, venue_id=venue_id, order=order))
     await db.commit()
-    return {"venue_name": venue_name.strip(), "order": order}
+    return {"venue_id": str(venue_id), "order": order}
 
 
 @router.delete("/me/top-venues/{venue_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -76,9 +76,9 @@ export const removeTopEvent = async (eventId) => {
   return api.delete(`/users/me/top-events/${eventId}`);
 };
 
-export const addTopVenue = async (venueName, order) => {
+export const addTopVenue = async (venueId, order) => {
   return api.post('/users/me/top-venues', null, {
-    params: { venue_name: venueName, order },
+    params: { venue_id: venueId, order },
   });
 };
 

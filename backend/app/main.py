@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import all API routers
-from app.api import auth, users, sets, events, logs, reviews, ratings, lists, tracks, track_search, track_ratings, track_reviews, standalone_tracks
+from app.api import auth, users, sets, events, logs, reviews, ratings, lists, tracks, track_search, track_ratings, track_reviews, standalone_tracks, venues
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -20,9 +20,18 @@ app = FastAPI(
 
 # Configure CORS (Cross-Origin Resource Sharing)
 # This allows the frontend (running on a different port) to make requests to the backend
+import os
+from app.config import settings
+
+# Get allowed origins from environment variable, default to localhost for dev
+allowed_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://localhost:5173"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # React/Vite dev server ports
+    allow_origins=allowed_origins,  # Can be set via CORS_ORIGINS env var (comma-separated)
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
@@ -43,6 +52,7 @@ app.include_router(track_search.router)
 app.include_router(track_ratings.router)
 app.include_router(track_reviews.router)
 app.include_router(standalone_tracks.router)
+app.include_router(venues.router)
 
 @app.get("/")
 def read_root():

@@ -471,23 +471,39 @@ class UserTopEvent(Base):
     )
 
 
+class Venue(Base):
+    """
+    Venue model - first-class entity like Event/Track that can be ranked in top 5.
+    """
+    __tablename__ = "venues"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    location: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    user_top_venues: Mapped["_List[UserTopVenue]"] = relationship("UserTopVenue", back_populates="venue", cascade="all, delete-orphan")
+
+
 class UserTopVenue(Base):
     """
-    User Top Venue - users can name up to 5 favorite venues (same pattern as top tracks; venue is free text).
+    User Top Venue - users can rank up to 5 venues (same pattern as top tracks/events).
     """
     __tablename__ = "user_top_venues"
     
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    venue_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    venue_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("venues.id"), nullable=False, index=True)
     order: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-5
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     
     user: Mapped["User"] = relationship("User", back_populates="top_venues")
+    venue: Mapped["Venue"] = relationship("Venue", back_populates="user_top_venues")
     
     __table_args__ = (
-        UniqueConstraint('user_id', 'venue_name', name='uq_user_top_venue'),
+        UniqueConstraint('user_id', 'venue_id', name='uq_user_top_venue'),
         UniqueConstraint('user_id', 'order', name='uq_user_top_venue_order'),
     )
 
