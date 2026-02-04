@@ -41,4 +41,14 @@ export const soundCloudCallback = async (code, state) => {
   });
 };
 
+export const getGoogleAuthUrl = async () => {
+  return api.get('/auth/google/authorize');
+};
+
+export const googleCallback = async (code, state) => {
+  return api.post('/auth/google/callback', null, {
+    params: { code, state },
+  });
+};
+
 

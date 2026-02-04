@@ -56,6 +56,12 @@ class User(Base):
     soundcloud_access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Encrypted in production
     soundcloud_refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
+    # Google OAuth fields
+    google_user_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    google_access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    google_refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    google_token_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    
     # Profile fields
     display_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

@@ -22,6 +22,7 @@ import SearchUsersPage from './pages/SearchUsersPage';
 import FriendsPage from './pages/FriendsPage';
 import ManageProfilePage from './pages/ManageProfilePage';
 import SoundCloudCallbackPage from './pages/SoundCloudCallbackPage';
+import GoogleCallbackPage from './pages/GoogleCallbackPage';
 import SetDetailsPage from './pages/SetDetailsPage';
 import TrackDetailsPage from './pages/TrackDetailsPage';
 import TopListsPage from './pages/TopListsPage';
@@ -66,6 +67,14 @@ function App() {
           element={
             <Layout>
               <SoundCloudCallbackPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/auth/google/callback"
+          element={
+            <Layout>
+              <GoogleCallbackPage />
             </Layout>
           }
         />

@@ -6,11 +6,12 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import useAuthStore from '../../store/authStore';
+import GoogleSignInButton from './GoogleSignInButton';
 import { APP_NAME } from '../../utils/constants';
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const { login, loginWithSoundCloud, loading, error, clearError } = useAuthStore();
+  const { login, loginWithSoundCloud, loginWithGoogle, loading, error, clearError } = useAuthStore();
   const navigate = useNavigate();
   const { register, handleSubmit, formState: { errors } } = useForm();
 
@@ -91,19 +92,30 @@ const LoginForm = () => {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => loginWithSoundCloud()}
-          disabled={loading}
-          className="mt-4 w-full flex items-center justify-center gap-2 bg-black hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          <img 
-            src="/6862460f240ad9ae4680f211_cloudmark-white.png" 
-            alt="SoundCloud" 
-            className="w-5 h-5"
+        <div className="mt-4 space-y-3">
+          <GoogleSignInButton
+            onSuccess={loginWithGoogle}
+            onError={(error) => {
+              // Error handling is managed by the auth store
+              console.error('Google sign-in error:', error);
+            }}
+            disabled={loading}
           />
-          {loading ? 'Connecting...' : 'Login with SoundCloud'}
-        </button>
+
+          <button
+            type="button"
+            onClick={() => loginWithSoundCloud()}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 bg-black hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <img 
+              src="/6862460f240ad9ae4680f211_cloudmark-white.png" 
+              alt="SoundCloud" 
+              className="w-5 h-5"
+            />
+            {loading ? 'Connecting...' : 'Login with SoundCloud'}
+          </button>
+        </div>
       </div>
 
       <p className="mt-4 text-center text-sm text-gray-600">
