@@ -22,7 +22,7 @@ const UserProfile = () => {
   const { user: currentUser } = useAuthStore();
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
-  const [activeTab, setActiveTab] = useState('stats');
+  const [activeTab, setActiveTab] = useState('listened');
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followingLoading, setFollowingLoading] = useState(false);
@@ -284,12 +284,6 @@ const UserProfile = () => {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Statistics</h2>
-        <UserStats stats={stats} loading={loading} userId={id} isOwnProfile={isOwnProfile} />
-      </div>
-
       {/* Top Sets */}
       {(topSets.length > 0 || isOwnProfile) && (
         <div className="mb-6">
@@ -323,11 +317,11 @@ const UserProfile = () => {
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8 px-6" aria-label="Tabs">
             {[
-              { id: 'stats', label: 'Stats' },
               { id: 'listened', label: 'Listened Sets' },
               { id: 'live-sets', label: 'Live Sets Seen' },
               { id: 'events', label: 'Events Attended' },
               { id: 'reviews', label: 'Reviews' },
+              { id: 'stats', label: 'Statistics' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -348,7 +342,8 @@ const UserProfile = () => {
         <div className="p-6">
           {activeTab === 'stats' && (
             <div>
-              <p className="text-gray-600">Detailed statistics coming soon...</p>
+              <h3 className="text-lg font-semibold mb-4">Statistics</h3>
+              <UserStats stats={stats} loading={loading} userId={id} isOwnProfile={isOwnProfile} />
             </div>
           )}
           {activeTab === 'listened' && (

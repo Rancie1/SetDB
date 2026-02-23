@@ -9,6 +9,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import * as tracksService from '../../services/tracksService';
 import * as standaloneTracksService from '../../services/standaloneTracksService';
 import useAuthStore from '../../store/authStore';
+import SpotifyEmbed from './SpotifyEmbed';
 
 const SoundCloudSearch = () => {
   const navigate = useNavigate();
@@ -104,9 +105,9 @@ const SoundCloudSearch = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-      <h2 className="text-xl font-semibold mb-4">🔍 Search Tracks</h2>
+      <h2 className="text-xl font-semibold mb-4">Search Tracks</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Search for tracks on SoundCloud and Spotify. Click on a track to view or create it.
+        Search SoundCloud and Spotify. Click on a track to view or add it to Deckd.
       </p>
 
       <form onSubmit={handleSearch} className="mb-4">
@@ -143,7 +144,7 @@ const SoundCloudSearch = () => {
           {searching ? (
             <div className="text-center py-8">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-              <p className="mt-2 text-sm text-gray-600">Searching SoundCloud...</p>
+              <p className="mt-2 text-sm text-gray-600">Searching...</p>
             </div>
           ) : searchResults.length > 0 ? (
             <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -163,67 +164,67 @@ const SoundCloudSearch = () => {
                     )}
                     
                     {/* Track Info */}
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-1">{track.title}</h3>
-                      <p className="text-sm text-gray-600 mb-2">{track.artist_name}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <h3 className="font-semibold text-gray-900 truncate">{track.title}</h3>
+                        {track.platform === 'spotify' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 flex-shrink-0">Spotify</span>
+                        )}
+                        {track.platform === 'soundcloud' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 flex-shrink-0">SoundCloud</span>
+                        )}
+                        {track.exists_in_db && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary-100 text-primary-700 flex-shrink-0">In Deckd</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mb-1 truncate">{track.artist_name}</p>
                       
-                      <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
-                        {track.duration_ms && (
-                          <span>⏱️ {formatDuration(track.duration_ms)}</span>
+                      <div className="flex items-center gap-3 text-xs text-gray-400">
+                        {track.duration_ms > 0 && (
+                          <span>{formatDuration(track.duration_ms)}</span>
                         )}
                         {track.playback_count > 0 && (
-                          <span>▶️ {track.playback_count.toLocaleString()} plays</span>
+                          <span>{track.playback_count.toLocaleString()} plays</span>
                         )}
                         {track.likes_count > 0 && (
-                          <span>❤️ {track.likes_count.toLocaleString()} likes</span>
+                          <span>{track.likes_count.toLocaleString()} likes</span>
                         )}
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 mt-2">
                         {track.exists_in_db && track.track_id ? (
                           <Link
                             to={`/tracks/${track.track_id}`}
-                            className="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-md transition-colors"
+                            className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium rounded-md transition-colors"
                           >
-                            View Track →
+                            View Track
                           </Link>
                         ) : (
                           <button
                             onClick={() => handleCreateOrViewTrack(track)}
                             disabled={addingTrack === track.id || !isAuthenticated()}
-                            className="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
-                            {addingTrack === track.id ? 'Creating...' : isAuthenticated() ? 'Create Track' : 'Log in to Create'}
+                            {addingTrack === track.id ? 'Adding...' : isAuthenticated() ? 'Add to Deckd' : 'Log in to Add'}
                           </button>
                         )}
-                        {track.soundcloud_url && (
+                        {(track.soundcloud_url || track.spotify_url) && (
                           <a
-                            href={track.soundcloud_url}
+                            href={track.soundcloud_url || track.spotify_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-4 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-md transition-colors"
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-md transition-colors"
                           >
-                            🎵 SoundCloud
+                            Open in {track.platform === 'spotify' ? 'Spotify' : 'SoundCloud'}
                           </a>
-                        )}
-                        {track.spotify_url && (
-                          <a
-                            href={track.spotify_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors"
-                          >
-                            🎵 Spotify
-                          </a>
-                        )}
-                        {track.preview_url && track.platform === 'spotify' && (
-                          <audio controls className="h-8">
-                            <source src={track.preview_url} type="audio/mpeg" />
-                            Your browser does not support the audio element.
-                          </audio>
                         )}
                       </div>
+                      {track.platform === 'spotify' && track.id && (
+                        <div className="mt-2">
+                          <SpotifyEmbed spotifyTrackId={track.id} compact={true} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

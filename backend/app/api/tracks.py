@@ -243,15 +243,16 @@ async def get_set_tracks(
             'position': link.position,
             'timestamp_minutes': float(link.timestamp_minutes) if link.timestamp_minutes is not None else None,
             'created_at': link.created_at,
-            'is_top_track': False,  # TrackSetLink entries don't support top tracks
+            'is_top_track': False,
             'top_track_order': None,
             'confirmation_count': link_conf_stats['confirmation_count'],
             'denial_count': link_conf_stats['denial_count'],
             'user_confirmation': link_confirmations.get(link.id),
-            'supports_confirmations': True,  # TrackSetLink entries now support confirmations
+            'supports_confirmations': True,
             'average_rating': float(avg_rating) if avg_rating else None,
             'rating_count': rating_count,
             'user_rating': user_ratings.get(track.id),
+            'track_entity_id': track.id,
         }
         
         if link.added_by:

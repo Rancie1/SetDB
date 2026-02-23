@@ -62,6 +62,12 @@ class User(Base):
     google_refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     google_token_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
+    # Spotify OAuth fields
+    spotify_user_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    spotify_access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    spotify_refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    spotify_token_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    
     # Profile fields
     display_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -754,6 +760,32 @@ class EventSet(Base):
     __table_args__ = (
         UniqueConstraint('event_id', 'set_id', name='uq_event_set'),
     )
+
+
+class Artist(Base):
+    """
+    Artist model - stores artist profiles sourced from Spotify.
+    
+    Artists are auto-created when Spotify tracks are imported.
+    Content is aggregated via name matching against Track.artist_name,
+    DJSet.dj_name/title, and Event.dj_name.
+    """
+    __tablename__ = "artists"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    spotify_artist_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    spotify_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    genres: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    
+    bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    instagram_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    soundcloud_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
 class EventConfirmation(Base):

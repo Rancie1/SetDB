@@ -18,10 +18,12 @@ import * as trackRatingsService from '../services/trackRatingsService';
 import * as trackReviewsService from '../services/trackReviewsService';
 import * as setsService from '../services/setsService';
 import * as tracksService from '../services/tracksService';
+import ArtistLink from '../components/shared/ArtistLink';
 import ReviewCard from '../components/reviews/ReviewCard';
 import ReviewForm from '../components/reviews/ReviewForm';
 import RatingDisplay from '../components/reviews/RatingDisplay';
 import SetCard from '../components/sets/SetCard';
+import SpotifyEmbed from '../components/tracks/SpotifyEmbed';
 
 const TrackDetailsPage = () => {
   const { id } = useParams();
@@ -49,6 +51,8 @@ const TrackDetailsPage = () => {
   const [settingTopTrack, setSettingTopTrack] = useState(false);
   const [showTopTrackSelector, setShowTopTrackSelector] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(null);
+  const [relatedTracks, setRelatedTracks] = useState([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -183,24 +187,23 @@ const TrackDetailsPage = () => {
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
-  // Convert MM:SS format to decimal minutes
+  // Convert HH:MM format to decimal minutes
   const parseTimestamp = (timestampStr) => {
     if (!timestampStr || !timestampStr.trim()) return null;
     
     const trimmed = timestampStr.trim();
-    // Handle MM:SS format
     if (trimmed.includes(':')) {
       const parts = trimmed.split(':');
       if (parts.length === 2) {
-        const minutes = parseInt(parts[0], 10) || 0;
-        const seconds = parseInt(parts[1], 10) || 0;
-        if (isNaN(minutes) || isNaN(seconds) || minutes < 0 || seconds < 0 || seconds >= 60) {
+        const hours = parseInt(parts[0], 10) || 0;
+        const minutes = parseInt(parts[1], 10) || 0;
+        if (isNaN(hours) || isNaN(minutes) || hours < 0 || minutes < 0 || minutes >= 60) {
           return null;
         }
-        return minutes + (seconds / 60);
+        return (hours * 60) + minutes;
       }
     }
-    // Handle decimal minutes as fallback
+    // Handle plain minutes as fallback
     const decimal = parseFloat(trimmed);
     return isNaN(decimal) ? null : decimal;
   };
@@ -212,7 +215,7 @@ const TrackDetailsPage = () => {
     const timestampMinutes = timestampInput ? parseTimestamp(timestampInput) : null;
     
     if (timestampInput && timestampMinutes === null) {
-      alert('Invalid timestamp format. Please use MM:SS format (e.g., 2:30)');
+      alert('Invalid timestamp format. Please use HH:MM format (e.g., 1:30)');
       return;
     }
     
@@ -279,6 +282,23 @@ const TrackDetailsPage = () => {
     }
   };
 
+  useEffect(() => {
+    const loadRelatedTracks = async () => {
+      if (!track?.artist_name) return;
+      setRelatedLoading(true);
+      try {
+        const response = await standaloneTracksService.getRelatedTracks(id, 6);
+        setRelatedTracks(response.data || []);
+      } catch (err) {
+        console.error('Failed to load related tracks:', err);
+        setRelatedTracks([]);
+      } finally {
+        setRelatedLoading(false);
+      }
+    };
+    loadRelatedTracks();
+  }, [track?.artist_name, id]);
+
   const formatDuration = (ms) => {
     if (!ms) return null;
     const seconds = Math.floor(ms / 1000);
@@ -331,7 +351,9 @@ const TrackDetailsPage = () => {
               {track.track_name}
             </h1>
             {track.artist_name && (
-              <p className="text-xl text-gray-600 mb-4">{track.artist_name}</p>
+              <p className="text-xl text-gray-600 mb-4">
+                <ArtistLink name={track.artist_name} />
+              </p>
             )}
             
             <div className="flex flex-wrap items-center gap-4 mb-4">
@@ -348,7 +370,7 @@ const TrackDetailsPage = () => {
                   🎵 SoundCloud
                 </a>
               )}
-              {track.spotify_url && (
+              {track.spotify_url && !track.spotify_track_id && (
                 <a
                   href={track.spotify_url}
                   target="_blank"
@@ -359,6 +381,17 @@ const TrackDetailsPage = () => {
                 </a>
               )}
             </div>
+
+            {/* Spotify Embed Player */}
+            {(track.spotify_track_id || track.spotify_url) && (
+              <div className="mt-4">
+                <SpotifyEmbed
+                  spotifyTrackId={track.spotify_track_id}
+                  spotifyUrl={track.spotify_url}
+                  compact={false}
+                />
+              </div>
+            )}
 
             {/* Top Track Management */}
             {isAuthenticated && (
@@ -435,36 +468,52 @@ const TrackDetailsPage = () => {
             {isAuthenticated ? (
               <div>
                 <p className="text-sm text-gray-600 mb-3">Your Rating:</p>
-                <div className="flex items-center space-x-1" onMouseLeave={() => setHoveredRating(null)}>
+                <div className="flex items-center" onMouseLeave={() => setHoveredRating(null)}>
                   {[1, 2, 3, 4, 5].map((star) => {
                     const displayRating = hoveredRating !== null ? hoveredRating : (userRating?.rating || 0);
-                    const isFilled = star <= displayRating;
+                    const halfVal = star - 0.5;
+                    const isHalfFilled = displayRating >= halfVal && displayRating < star;
+                    const isFullFilled = displayRating >= star;
+
+                    const submitRating = async (rating) => {
+                      try {
+                        await trackRatingsService.createTrackRating(id, rating);
+                        handleRatingChange();
+                      } catch (err) {
+                        console.error('Failed to rate track:', err);
+                        alert(err.response?.data?.detail || 'Failed to rate track');
+                      }
+                    };
+
                     return (
-                      <div key={star} className="relative inline-block" style={{ width: '2.5rem', height: '2.5rem' }}>
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            const rating = star;
-                            try {
-                              await trackRatingsService.createTrackRating(id, rating);
-                              handleRatingChange();
-                            } catch (err) {
-                              console.error('Failed to rate track:', err);
-                              alert(err.response?.data?.detail || 'Failed to rate track');
-                            }
-                          }}
-                          onMouseEnter={() => setHoveredRating(star)}
-                          className="absolute inset-0 z-20"
-                          title={`${star} stars`}
-                        />
+                      <div key={star} className="relative" style={{ width: '2.5rem', height: '2.5rem' }}>
+                        {/* Background empty star */}
                         <div className="absolute inset-0 text-gray-300 text-4xl pointer-events-none flex items-center justify-center">
                           ★
                         </div>
-                        {isFilled && (
-                          <div className="absolute inset-0 text-yellow-400 text-4xl pointer-events-none flex items-center justify-center z-10">
+                        {/* Half-filled star (clip left half) */}
+                        {(isHalfFilled || isFullFilled) && (
+                          <div
+                            className="absolute inset-0 text-yellow-400 text-4xl pointer-events-none flex items-center justify-center z-10"
+                            style={isHalfFilled && !isFullFilled ? { clipPath: 'inset(0 50% 0 0)' } : undefined}
+                          >
                             ★
                           </div>
                         )}
+                        {/* Left half button (half star) */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); submitRating(halfVal); }}
+                          onMouseEnter={() => setHoveredRating(halfVal)}
+                          className="absolute inset-y-0 left-0 w-1/2 z-20 cursor-pointer"
+                          title={`${halfVal} stars`}
+                        />
+                        {/* Right half button (full star) */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); submitRating(star); }}
+                          onMouseEnter={() => setHoveredRating(star)}
+                          className="absolute inset-y-0 right-0 w-1/2 z-20 cursor-pointer"
+                          title={`${star} stars`}
+                        />
                       </div>
                     );
                   })}
@@ -667,17 +716,17 @@ const TrackDetailsPage = () => {
                   return hasRecording && (
                     <div className="mb-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Timestamp (MM:SS)
+                        Timestamp (HH:MM)
                       </label>
                       <input
                         type="text"
                         value={timestampInput}
                         onChange={(e) => setTimestampInput(e.target.value)}
                         pattern="[0-9]+:[0-5][0-9]"
-                        placeholder="e.g., 2:30"
+                        placeholder="e.g., 1:30"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       />
-                      <p className="text-xs text-gray-500 mt-1">When in the recording this track starts (optional, format: MM:SS)</p>
+                      <p className="text-xs text-gray-500 mt-1">When in the recording this track starts (optional, format: HH:MM)</p>
                     </div>
                   );
                 })()}
@@ -725,6 +774,53 @@ const TrackDetailsPage = () => {
               </div>
             )}
           </div>
+
+          {/* More by this Artist */}
+          {(track.artist_name || relatedTracks.length > 0) && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold">More by {track.artist_name || 'this Artist'}</h2>
+              </div>
+
+              {relatedLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-16"></div>
+                  ))}
+                </div>
+              ) : relatedTracks.length === 0 ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                  <p className="text-gray-500 text-sm">No other tracks by this artist yet, use the tracks page to discover more by {track.artist_name}</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {relatedTracks.map((relTrack) => (
+                    <Link
+                      key={relTrack.id}
+                      to={`/tracks/${relTrack.id}`}
+                      className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-sm hover:border-primary-200 transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        {relTrack.thumbnail_url && (
+                          <img
+                            src={relTrack.thumbnail_url}
+                            alt={relTrack.track_name}
+                            className="w-10 h-10 rounded object-cover flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{relTrack.track_name}</h4>
+                          {relTrack.average_rating && (
+                            <span className="text-xs text-yellow-600">⭐ {relTrack.average_rating.toFixed(1)}</span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -736,7 +832,9 @@ const TrackDetailsPage = () => {
               {track.artist_name && (
                 <div>
                   <dt className="text-gray-500">Artist</dt>
-                  <dd className="font-medium text-gray-900">{track.artist_name}</dd>
+                  <dd className="font-medium text-gray-900">
+                    <ArtistLink name={track.artist_name} />
+                  </dd>
                 </div>
               )}
               {track.duration_ms && (

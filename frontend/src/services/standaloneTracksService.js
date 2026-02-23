@@ -35,3 +35,7 @@ export const setTopTrack = async (trackId, order) => {
 export const unsetTopTrack = async (trackId) => {
   return api.delete(`/tracks/${trackId}/unset-top`);
 };
+
+export const getRelatedTracks = async (trackId, limit = 6) => {
+  return api.get(`/tracks/${trackId}/related`, { params: { limit } });
+};

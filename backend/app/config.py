@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # OAuth Redirect URLs
     SOUNDCLOUD_REDIRECT_URI: Optional[str] = None  # e.g., "http://localhost:5173/auth/soundcloud/callback"
     GOOGLE_REDIRECT_URI: Optional[str] = None  # e.g., "http://localhost:5173/auth/google/callback"
+    SPOTIFY_REDIRECT_URI: Optional[str] = None  # e.g., "http://127.0.0.1:5173/auth/spotify/callback"
     
     model_config = ConfigDict(
         env_file=".env",
@@ -91,6 +92,14 @@ class Settings(BaseSettings):
         if v not in ['development', 'production']:
             raise ValueError(f"ENVIRONMENT must be 'development' or 'production', got: {v}")
         return v
+    
+    def is_spotify_oauth_configured(self) -> bool:
+        """Check if Spotify OAuth is properly configured."""
+        return bool(
+            self.SPOTIFY_CLIENT_ID and 
+            self.SPOTIFY_CLIENT_SECRET and 
+            self.SPOTIFY_REDIRECT_URI
+        )
     
     def is_google_oauth_configured(self) -> bool:
         """Check if Google OAuth is properly configured."""

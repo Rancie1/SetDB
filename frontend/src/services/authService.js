@@ -51,4 +51,14 @@ export const googleCallback = async (code, state) => {
   });
 };
 
+export const getSpotifyAuthUrl = async () => {
+  return api.get('/auth/spotify/authorize');
+};
+
+export const spotifyCallback = async (code, state) => {
+  return api.post('/auth/spotify/callback', null, {
+    params: { code, state },
+  });
+};
+
 

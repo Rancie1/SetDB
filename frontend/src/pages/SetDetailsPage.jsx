@@ -25,6 +25,7 @@ import LinkToLiveEventForm from '../components/sets/LinkToLiveEventForm';
 import TrackTag from '../components/sets/TrackTag';
 import TrackTagForm from '../components/sets/TrackTagForm';
 import * as tracksService from '../services/tracksService';
+import ArtistLink from '../components/shared/ArtistLink';
 
 const SetDetailsPage = () => {
   const { id } = useParams();
@@ -435,7 +436,7 @@ const SetDetailsPage = () => {
           {error || 'Set not found'}
         </div>
         <Link
-          to="/discover"
+          to="/"
           className="mt-4 inline-block text-primary-600 hover:text-primary-700"
         >
           ← Back to Discover
@@ -450,7 +451,7 @@ const SetDetailsPage = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back Button */}
       <Link
-        to="/discover"
+        to="/"
         className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6"
       >
         <span className="mr-2">←</span>
@@ -519,7 +520,9 @@ const SetDetailsPage = () => {
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
               {currentSet.title}
             </h1>
-            <p className="text-xl text-gray-600 mb-4">{currentSet.dj_name}</p>
+            <p className="text-xl text-gray-600 mb-4">
+              <ArtistLink name={currentSet.dj_name} />
+            </p>
 
             {/* Live set with recording indicator */}
             {currentSet.source_type?.toLowerCase() === 'live' && currentSet.recording_url && (

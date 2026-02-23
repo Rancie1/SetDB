@@ -50,7 +50,8 @@ export const markSetAsLive = async (setId) => {
   return api.post(`/sets/${setId}/mark-as-live`);
 };
 
-// Event-related functions moved to eventsService.js
-// Use eventsService for all event operations
-
-
+export const searchSoundCloudSets = async (query, limit = 10) => {
+  return api.get('/sets/search/soundcloud', {
+    params: { query, limit },
+  });
+};

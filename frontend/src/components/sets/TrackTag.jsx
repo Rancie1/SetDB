@@ -5,9 +5,11 @@
  */
 
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import * as tracksService from '../../services/tracksService';
 import * as trackRatingsService from '../../services/trackRatingsService';
 import useAuthStore from '../../store/authStore';
+import ArtistLink from '../shared/ArtistLink';
 
 const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasRecording, onRatingChange }) => {
   const { isAuthenticated, user } = useAuthStore();
@@ -26,12 +28,10 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
 
   const formatTimestamp = (minutes) => {
     if (!minutes && minutes !== 0) return null;
-    const mins = Math.floor(minutes);
-    const secs = Math.round((minutes - mins) * 60);
-    if (secs === 0) {
-      return `${mins}:00`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    const totalMinutes = Math.round(minutes);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${hours}:${mins.toString().padStart(2, '0')}`;
   };
 
   const handleConfirm = async (isConfirmed) => {
@@ -95,7 +95,16 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <p className="text-sm font-medium text-gray-900">{track.track_name}</p>
+            {track.track_entity_id ? (
+              <Link
+                to={`/tracks/${track.track_entity_id}`}
+                className="text-sm font-medium text-gray-900 hover:text-primary-600 transition-colors"
+              >
+                {track.track_name}
+              </Link>
+            ) : (
+              <p className="text-sm font-medium text-gray-900">{track.track_name}</p>
+            )}
             {(track.timestamp_minutes != null && track.timestamp_minutes !== undefined) && setHasRecording && (
               <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
                 {formatTimestamp(track.timestamp_minutes)}
@@ -103,7 +112,9 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
             )}
           </div>
           {track.artist_name && (
-            <p className="text-xs text-gray-600 mb-2">{track.artist_name}</p>
+            <p className="text-xs text-gray-600 mb-2">
+              <ArtistLink name={track.artist_name} />
+            </p>
           )}
           
           {/* Rating and Confirmation Stats */}

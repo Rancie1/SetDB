@@ -14,6 +14,7 @@ import useAuthStore from '../store/authStore';
 import * as eventsService from '../services/eventsService';
 import * as setsService from '../services/setsService';
 import * as usersService from '../services/usersService';
+import ArtistLink from '../components/shared/ArtistLink';
 
 const EventDetailsPage = () => {
   const { id } = useParams();
@@ -317,7 +318,9 @@ const EventDetailsPage = () => {
               {event.event_name || event.title}
             </h1>
             {event.dj_name && event.dj_name !== 'Various Artists' && (
-              <p className="text-xl text-gray-600 mb-4">{event.dj_name}</p>
+              <p className="text-xl text-gray-600 mb-4">
+                <ArtistLink name={event.dj_name} />
+              </p>
             )}
 
             {/* Verification Status */}

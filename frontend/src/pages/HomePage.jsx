@@ -14,7 +14,7 @@ const HomePage = () => {
         </p>
         <div className="flex justify-center space-x-4">
           <a
-            href="/discover"
+            href="/"
             className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-md font-medium"
           >
             Discover Sets

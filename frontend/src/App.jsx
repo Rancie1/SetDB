@@ -23,9 +23,12 @@ import FriendsPage from './pages/FriendsPage';
 import ManageProfilePage from './pages/ManageProfilePage';
 import SoundCloudCallbackPage from './pages/SoundCloudCallbackPage';
 import GoogleCallbackPage from './pages/GoogleCallbackPage';
+import SpotifyCallbackPage from './pages/SpotifyCallbackPage';
 import SetDetailsPage from './pages/SetDetailsPage';
 import TrackDetailsPage from './pages/TrackDetailsPage';
 import TopListsPage from './pages/TopListsPage';
+import ArtistPage from './pages/ArtistPage';
+
 
 function App() {
   const { checkAuth } = useAuthStore();
@@ -75,6 +78,14 @@ function App() {
           element={
             <Layout>
               <GoogleCallbackPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/auth/spotify/callback"
+          element={
+            <Layout>
+              <SpotifyCallbackPage />
             </Layout>
           }
         />
@@ -146,6 +157,22 @@ function App() {
           element={
             <Layout>
               <TrackDetailsPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/artists/:id"
+          element={
+            <Layout>
+              <ArtistPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/artists/name/:name"
+          element={
+            <Layout>
+              <ArtistPage />
             </Layout>
           }
         />

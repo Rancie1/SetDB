@@ -243,13 +243,12 @@ class SetTrackResponse(BaseSchema):
     is_top_track: Optional[bool] = False
     top_track_order: Optional[int] = None
     created_at: datetime
-    # Include user info for display
     added_by: Optional[UserResponse] = None
-    # Confirmation stats
     confirmation_count: Optional[int] = 0
     denial_count: Optional[int] = 0
-    user_confirmation: Optional[bool] = None  # Current user's confirmation status
-    supports_confirmations: Optional[bool] = True  # Whether this track supports confirmations (SetTrack = True, TrackSetLink = False)
+    user_confirmation: Optional[bool] = None
+    supports_confirmations: Optional[bool] = True
+    track_entity_id: Optional[UUID] = None  # ID of the standalone Track entity (for TrackSetLink entries)
     # Rating stats
     average_rating: Optional[float] = None
     rating_count: Optional[int] = 0
@@ -287,6 +286,7 @@ class TrackCreate(BaseSchema):
     spotify_track_id: Optional[str] = Field(None, max_length=255)
     thumbnail_url: Optional[str] = Field(None, max_length=500)
     duration_ms: Optional[int] = None
+    spotify_artist_ids: Optional[List[str]] = None
 
 
 class TrackResponse(BaseSchema):
@@ -636,3 +636,36 @@ class CreateLiveEventFromSetRequest(BaseSchema):
     event_name: Optional[str] = Field(None, max_length=255)
     event_date: Optional[date] = None
     venue_location: Optional[str] = Field(None, max_length=255)
+
+
+# ============================================================================
+# ARTIST SCHEMAS
+# ============================================================================
+
+class ArtistResponse(BaseSchema):
+    """Schema for artist response."""
+    id: UUID
+    name: str
+    spotify_artist_id: str
+    spotify_url: Optional[str] = None
+    image_url: Optional[str] = None
+    genres: Optional[str] = None
+    bio: Optional[str] = None
+    instagram_url: Optional[str] = None
+    soundcloud_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ArtistDetailResponse(ArtistResponse):
+    """Artist response with aggregated tracks, sets, and events."""
+    tracks: List[Any] = []
+    sets: List[Any] = []
+    events: List[Any] = []
+
+
+class ArtistUpdate(BaseSchema):
+    """Schema for updating artist profile (user-editable fields)."""
+    bio: Optional[str] = None
+    instagram_url: Optional[str] = Field(None, max_length=500)
+    soundcloud_url: Optional[str] = Field(None, max_length=500)

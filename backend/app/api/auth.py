@@ -4,7 +4,8 @@ Authentication API routes.
 Handles user registration, login, and token management.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -38,6 +39,13 @@ from app.services.google_oauth import (
     ensure_valid_google_token,
     GoogleOAuthConfigurationError,
     GoogleOAuthAPIError
+)
+from app.services.spotify_oauth import (
+    get_spotify_oauth_url,
+    exchange_code_for_token as spotify_exchange_code_for_token,
+    get_spotify_user_info,
+    SpotifyOAuthConfigurationError,
+    SpotifyOAuthAPIError
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -782,4 +790,292 @@ async def refresh_google_access_token(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while refreshing your Google token. Please try again."
         )
+
+
+# ──────────────────────────── Spotify OAuth ────────────────────────────
+
+@router.get("/spotify/authorize")
+async def spotify_authorize():
+    """
+    Get Spotify OAuth authorization URL.
+    
+    Returns a URL that the frontend should redirect the user to.
+    The state parameter is stored server-side for CSRF protection.
+    """
+    state = secrets.token_urlsafe(32)
+    _store_state(state)
+    
+    try:
+        auth_url = get_spotify_oauth_url(state)
+        return {
+            "authorization_url": auth_url,
+            "state": state
+        }
+    except SpotifyOAuthConfigurationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in spotify_authorize: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred. Please try again later."
+        )
+
+
+@router.get("/spotify/config")
+async def spotify_config_status():
+    """
+    Check if Spotify OAuth is properly configured.
+    
+    Returns configuration status for frontend to conditionally show Spotify sign-in button.
+    """
+    from app.config import settings
+    
+    is_configured = settings.is_spotify_oauth_configured()
+    
+    return {
+        "configured": is_configured,
+        "environment": settings.ENVIRONMENT,
+    }
+
+
+@router.get("/spotify/callback")
+async def spotify_callback_redirect(request: Request):
+    """
+    Handle Spotify OAuth redirect (GET).
+    
+    Spotify redirects the user's browser here after authorization.
+    This endpoint forwards the code and state to the frontend callback page,
+    which then completes the exchange via the POST endpoint.
+    """
+    code = request.query_params.get("code")
+    state = request.query_params.get("state")
+    error = request.query_params.get("error")
+    
+    frontend_url = "http://localhost:5173/auth/spotify/callback"
+    
+    if error:
+        return RedirectResponse(url=f"{frontend_url}?error={error}")
+    
+    if code and state:
+        return RedirectResponse(url=f"{frontend_url}?code={code}&state={state}")
+    
+    return RedirectResponse(url=f"{frontend_url}?error=missing_params")
+
+
+@router.post("/spotify/callback", response_model=Token)
+async def spotify_callback(
+    code: str,
+    state: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Handle Spotify OAuth callback.
+    
+    Validates the state parameter for CSRF protection, then exchanges 
+    the authorization code for an access token, fetches user info from Spotify, 
+    and either:
+    - Creates a new user account if they don't exist
+    - Links Spotify credentials to existing account if email matches
+    - Logs in existing user if they already have Spotify linked
+    
+    Returns a JWT access token for the app.
+    """
+    # Validate state parameter for CSRF protection
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing state parameter. Possible CSRF attack."
+        )
+    
+    if not _validate_and_consume_state(state):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired state parameter. Possible CSRF attack."
+        )
+    
+    # Exchange code for token
+    try:
+        token_data = await spotify_exchange_code_for_token(code)
+    except SpotifyOAuthConfigurationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        )
+    except SpotifyOAuthAPIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during Spotify token exchange: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during authentication. Please try again."
+        )
+    
+    if not token_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to exchange authorization code for token. Please try signing in again."
+        )
+    
+    access_token = token_data.get("access_token")
+    refresh_token = token_data.get("refresh_token")
+    expires_in = token_data.get("expires_in")
+    
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No access token received from Spotify. Please try signing in again."
+        )
+    
+    # Calculate token expiration time
+    token_expires_at = None
+    if expires_in:
+        token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+    
+    # Get user info from Spotify
+    try:
+        spotify_user = await get_spotify_user_info(access_token)
+    except SpotifyOAuthAPIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during Spotify user info fetch: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while fetching user information. Please try again."
+        )
+    
+    if not spotify_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to fetch user information from Spotify. Please try signing in again."
+        )
+    
+    spotify_user_id = str(spotify_user.get("id"))
+    spotify_email = spotify_user.get("email", "")
+    spotify_display_name = spotify_user.get("display_name", "")
+    # Spotify images is a list of image objects with url, height, width
+    spotify_images = spotify_user.get("images", [])
+    spotify_avatar = spotify_images[0]["url"] if spotify_images else ""
+    
+    try:
+        # Check if user already exists by Spotify ID
+        result = await db.execute(
+            select(User).where(User.spotify_user_id == spotify_user_id)
+        )
+        existing_user = result.scalar_one_or_none()
+        
+        if existing_user:
+            # Update tokens and user info
+            existing_user.spotify_access_token = access_token
+            existing_user.spotify_refresh_token = refresh_token
+            existing_user.spotify_token_expires_at = token_expires_at
+            if spotify_avatar and not existing_user.avatar_url:
+                existing_user.avatar_url = spotify_avatar
+            if spotify_display_name and not existing_user.display_name:
+                existing_user.display_name = spotify_display_name
+            
+            await db.commit()
+            await db.refresh(existing_user)
+            
+            jwt_token = create_access_token(data={"sub": str(existing_user.id)})
+            return {"access_token": jwt_token, "token_type": "bearer"}
+        
+        # Check if user exists by email (for account linking)
+        if spotify_email:
+            result = await db.execute(
+                select(User).where(User.email == spotify_email)
+            )
+            existing_user_by_email = result.scalar_one_or_none()
+            
+            if existing_user_by_email:
+                # Link Spotify credentials to existing account
+                existing_user_by_email.spotify_user_id = spotify_user_id
+                existing_user_by_email.spotify_access_token = access_token
+                existing_user_by_email.spotify_refresh_token = refresh_token
+                existing_user_by_email.spotify_token_expires_at = token_expires_at
+                if spotify_avatar and not existing_user_by_email.avatar_url:
+                    existing_user_by_email.avatar_url = spotify_avatar
+                if spotify_display_name and not existing_user_by_email.display_name:
+                    existing_user_by_email.display_name = spotify_display_name
+                
+                await db.commit()
+                await db.refresh(existing_user_by_email)
+                
+                jwt_token = create_access_token(data={"sub": str(existing_user_by_email.id)})
+                return {"access_token": jwt_token, "token_type": "bearer"}
+        
+        # Create new user
+        if spotify_display_name:
+            base_username = spotify_display_name.lower().replace(" ", "_")
+        elif spotify_email:
+            base_username = spotify_email.split("@")[0].lower()
+        else:
+            base_username = "spotify_user"
+        
+        import re
+        base_username = re.sub(r'[^a-z0-9_]', '', base_username)
+        if not base_username:
+            base_username = "spotify_user"
+        
+        username = base_username
+        counter = 1
+        
+        while True:
+            result = await db.execute(select(User).where(User.username == username))
+            if not result.scalar_one_or_none():
+                break
+            username = f"{base_username}_{counter}"
+            counter += 1
+        
+        email = spotify_email if spotify_email else f"{username}@spotify.oauth"
+        
+        counter = 1
+        while True:
+            result = await db.execute(select(User).where(User.email == email))
+            if not result.scalar_one_or_none():
+                break
+            email = f"{username}_{counter}@spotify.oauth"
+            counter += 1
+        
+        new_user = User(
+            username=username,
+            email=email,
+            hashed_password=None,
+            display_name=spotify_display_name or username,
+            avatar_url=spotify_avatar,
+            spotify_user_id=spotify_user_id,
+            spotify_access_token=access_token,
+            spotify_refresh_token=refresh_token,
+            spotify_token_expires_at=token_expires_at,
+        )
+        
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+        
+        jwt_token = create_access_token(data={"sub": str(new_user.id)})
+        return {"access_token": jwt_token, "token_type": "bearer"}
+        
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Database error during Spotify OAuth callback: {str(e)}", exc_info=True)
+        
+        if "unique constraint" in str(e).lower() or "duplicate" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this Spotify profile already exists or there was a conflict creating your account. Please try again."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="A database error occurred while creating your account. Please try again later."
+            )
 

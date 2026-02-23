@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import all API routers
-from app.api import auth, users, sets, events, logs, reviews, ratings, lists, tracks, track_search, track_ratings, track_reviews, standalone_tracks, venues
+from app.api import auth, users, sets, events, logs, reviews, ratings, lists, tracks, track_search, track_ratings, track_reviews, standalone_tracks, venues, spotify_browse, artists
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -53,6 +53,8 @@ app.include_router(track_ratings.router)
 app.include_router(track_reviews.router)
 app.include_router(standalone_tracks.router)
 app.include_router(venues.router)
+app.include_router(spotify_browse.router)
+app.include_router(artists.router)
 
 @app.get("/")
 def read_root():

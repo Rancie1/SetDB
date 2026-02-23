@@ -264,6 +264,65 @@ const useAuthStore = create((set, get) => ({
       return { success: false, error: errorMessage };
     }
   },
+
+  loginWithSpotify: async () => {
+    set({ loading: true, error: null });
+    try {
+      const response = await authService.getSpotifyAuthUrl();
+      const { authorization_url, state } = response.data;
+      
+      sessionStorage.setItem('spotify_oauth_state', state);
+      
+      window.location.href = authorization_url;
+    } catch (error) {
+      const errorMessage = error.response?.data?.detail || 'Failed to initiate Spotify login';
+      set({
+        loading: false,
+        error: errorMessage,
+      });
+      return { success: false, error: errorMessage };
+    }
+  },
+
+  handleSpotifyCallback: async (code, state) => {
+    set({ loading: true, error: null });
+    try {
+      const storedState = sessionStorage.getItem('spotify_oauth_state');
+      if (storedState !== state) {
+        throw new Error('Invalid state parameter. Possible CSRF attack.');
+      }
+      
+      const response = await authService.spotifyCallback(code, state);
+      const { access_token } = response.data;
+      
+      sessionStorage.removeItem('spotify_oauth_state');
+      
+      api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      const userResponse = await authService.getCurrentUser();
+      const user = userResponse.data;
+      
+      localStorage.setItem('token', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      set({
+        token: access_token,
+        user: user,
+        loading: false,
+        error: null,
+      });
+      
+      return { success: true };
+    } catch (error) {
+      sessionStorage.removeItem('spotify_oauth_state');
+      
+      const errorMessage = error.response?.data?.detail || error.message || 'Spotify login failed';
+      set({
+        loading: false,
+        error: errorMessage,
+      });
+      return { success: false, error: errorMessage };
+    }
+  },
 }));
 
 export default useAuthStore;

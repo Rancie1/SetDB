@@ -302,6 +302,22 @@ async def delete_set(
     return None
 
 
+@router.get("/search/soundcloud", response_model=list)
+async def search_soundcloud_sets(
+    query: str = Query(..., min_length=1, description="Search query"),
+    limit: int = Query(10, ge=1, le=50),
+):
+    """
+    Search for DJ sets/mixes on SoundCloud.
+    
+    Returns long-form SoundCloud content (> 10 min) which are likely mixes/sets.
+    Excludes podcasts.
+    """
+    from app.services.soundcloud_search import search_soundcloud_sets as sc_search
+    results = await sc_search(query, limit)
+    return results
+
+
 @router.post("/import/youtube", response_model=DJSetResponse, status_code=status.HTTP_201_CREATED)
 async def import_from_youtube(
     import_request: ImportSetRequest,

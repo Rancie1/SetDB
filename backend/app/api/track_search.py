@@ -289,6 +289,16 @@ async def resolve_track_url(
     if is_soundcloud:
         track_info = await soundcloud_search.resolve_soundcloud_url(url)
         if track_info:
+            kind = track_info.get('kind', 'track')
+            if kind in ('playlist',):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="This URL points to a playlist/set, not a track. Please import it on the Sets page instead."
+                )
+            # Long-form content (> 20 min) is likely a DJ set
+            duration_ms = track_info.get('duration_ms', 0)
+            if duration_ms > 1200000:
+                track_info['_warning'] = 'This looks like a DJ set/mix (over 20 minutes). Consider importing it as a set instead.'
             track_info['platform'] = 'soundcloud'
     elif is_spotify:
         track_info = await spotify_search.resolve_spotify_url(url)

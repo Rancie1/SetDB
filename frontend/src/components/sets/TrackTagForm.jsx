@@ -25,24 +25,23 @@ const TrackTagForm = ({ setId, onSubmit, onCancel, setHasRecording = false }) =>
   const [submitting, setSubmitting] = useState(false);
   const [addingTrack, setAddingTrack] = useState(null);
 
-  // Convert MM:SS format to decimal minutes
+  // Convert HH:MM format to decimal minutes
   const parseTimestamp = (timestampStr) => {
     if (!timestampStr || !timestampStr.trim()) return null;
     
     const trimmed = timestampStr.trim();
-    // Handle MM:SS format
     if (trimmed.includes(':')) {
       const parts = trimmed.split(':');
       if (parts.length === 2) {
-        const minutes = parseInt(parts[0], 10) || 0;
-        const seconds = parseInt(parts[1], 10) || 0;
-        if (isNaN(minutes) || isNaN(seconds) || minutes < 0 || seconds < 0 || seconds >= 60) {
+        const hours = parseInt(parts[0], 10) || 0;
+        const minutes = parseInt(parts[1], 10) || 0;
+        if (isNaN(hours) || isNaN(minutes) || hours < 0 || minutes < 0 || minutes >= 60) {
           return null;
         }
-        return minutes + (seconds / 60);
+        return (hours * 60) + minutes;
       }
     }
-    // Handle decimal minutes as fallback
+    // Handle plain minutes as fallback
     const decimal = parseFloat(trimmed);
     return isNaN(decimal) ? null : decimal;
   };
@@ -158,7 +157,7 @@ const TrackTagForm = ({ setId, onSubmit, onCancel, setHasRecording = false }) =>
       const timestampMinutes = timestampInput ? parseTimestamp(timestampInput) : null;
       
       if (timestampInput && timestampMinutes === null) {
-        alert('Invalid timestamp format. Please use MM:SS format (e.g., 2:30)');
+        alert('Invalid timestamp format. Please use HH:MM format (e.g., 1:30)');
         setAddingTrack(null);
         return;
       }
@@ -327,7 +326,7 @@ const TrackTagForm = ({ setId, onSubmit, onCancel, setHasRecording = false }) =>
         {setHasRecording && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Timestamp (MM:SS)
+              Timestamp (HH:MM)
             </label>
             <input
               type="text"
@@ -335,9 +334,9 @@ const TrackTagForm = ({ setId, onSubmit, onCancel, setHasRecording = false }) =>
               onChange={(e) => setTimestampInput(e.target.value)}
               pattern="[0-9]+:[0-5][0-9]"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="e.g., 2:30"
+              placeholder="e.g., 1:30"
             />
-            <p className="text-xs text-gray-500 mt-1">When in the recording this track starts (optional, format: MM:SS)</p>
+            <p className="text-xs text-gray-500 mt-1">When in the recording this track starts (optional, format: HH:MM)</p>
           </div>
         )}
 

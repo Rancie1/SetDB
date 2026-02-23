@@ -130,7 +130,16 @@ async def create_track(
     await db.commit()
     await db.refresh(new_track)
     
-    # Convert to response
+    # Auto-create Artist entries from Spotify artist IDs
+    if track_data.spotify_artist_ids:
+        try:
+            from app.api.artists import ensure_artists_from_spotify
+            await ensure_artists_from_spotify(track_data.spotify_artist_ids, db)
+            await db.commit()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to auto-create artists: {e}")
+    
     track_dict = TrackResponse.model_validate(new_track).model_dump()
     track_dict['average_rating'] = None
     track_dict['rating_count'] = 0
@@ -214,6 +223,58 @@ async def get_track(
     track_dict['top_track_order'] = top_track_order
     
     return TrackResponse(**track_dict)
+
+
+@router.get("/{track_id}/related", response_model=List[TrackResponse])
+async def get_related_tracks(
+    track_id: UUID,
+    limit: int = Query(6, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get other tracks that share any individual artist with this track."""
+    import re
+    result = await db.execute(select(Track).where(Track.id == track_id))
+    track = result.scalar_one_or_none()
+    if not track or not track.artist_name:
+        return []
+
+    # Split multi-artist strings on common delimiters: , / & feat. ft. x
+    individual_artists = [
+        a.strip() for a in re.split(r'[,/&]|(?:\s+(?:feat\.?|ft\.?|x|vs\.?)\s+)', track.artist_name, flags=re.IGNORECASE)
+        if a.strip()
+    ]
+
+    # Build conditions: match any track whose artist_name contains any of these artists
+    conditions = []
+    for artist in individual_artists:
+        conditions.append(func.lower(Track.artist_name).contains(artist.lower()))
+
+    query = (
+        select(Track)
+        .where(
+            or_(*conditions),
+            Track.id != track_id,
+        )
+        .order_by(Track.created_at.desc())
+        .limit(limit)
+    )
+    related_result = await db.execute(query)
+    related_tracks = related_result.scalars().all()
+
+    responses = []
+    for t in related_tracks:
+        t_dict = TrackResponse.model_validate(t).model_dump()
+        rating_q = await db.execute(
+            select(
+                func.avg(TrackRating.rating).label('avg'),
+                func.count(TrackRating.id).label('cnt'),
+            ).where(TrackRating.track_id == t.id)
+        )
+        row = rating_q.first()
+        t_dict['average_rating'] = float(row[0]) if row and row[0] else None
+        t_dict['rating_count'] = row[1] if row else 0
+        responses.append(TrackResponse(**t_dict))
+    return responses
 
 
 @router.post("/{track_id}/link-to-set", response_model=TrackSetLinkResponse, status_code=status.HTTP_201_CREATED)

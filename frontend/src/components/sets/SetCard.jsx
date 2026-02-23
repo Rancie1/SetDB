@@ -5,6 +5,7 @@
  */
 
 import { Link } from 'react-router-dom';
+import ArtistLink from '../shared/ArtistLink';
 
 const SetCard = ({ set }) => {
   if (!set) return null;
@@ -156,7 +157,9 @@ const SetCard = ({ set }) => {
         <h3 className="text-lg font-semibold text-gray-900 mb-1 line-clamp-2">
           {set.title}
         </h3>
-        <p className="text-sm text-gray-600 mb-2">{set.dj_name}</p>
+        <p className="text-sm text-gray-600 mb-2">
+          <ArtistLink name={set.dj_name} />
+        </p>
 
         {/* Live set with recording indicator */}
         {set.source_type?.toLowerCase() === 'live' && set.recording_url && (

@@ -155,224 +155,175 @@ async def get_activity_feed(
                 "pages": 0
             }
     
-    # Collect all activities
     activities = []
     
-    # Set reviews
-    set_reviews_query = select(Review).where(Review.is_public == True)
-    if user_ids:
-        set_reviews_query = set_reviews_query.where(Review.user_id.in_(user_ids))
-    set_reviews_query = set_reviews_query.order_by(Review.created_at.desc()).limit(limit * 3)
-    set_reviews_result = await db.execute(set_reviews_query)
-    set_reviews = set_reviews_result.scalars().all()
-    
-    for review in set_reviews:
-        await db.refresh(review, ["user", "set"])
-        review_response = ReviewResponse.model_validate(review)
-        # Add set data to review response dict
-        review_dict = review_response.model_dump()
-        if review.set:
-            review_dict["set"] = DJSetResponse.model_validate(review.set).model_dump()
-        activities.append({
-            "activity_type": "set_review",
-            "created_at": review.created_at,
-            "user": UserResponse.model_validate(review.user).model_dump(),
-            "set_review": review_dict,
+    def _base_activity(activity_type, created_at, user_resp):
+        return {
+            "activity_type": activity_type,
+            "created_at": created_at,
+            "user": user_resp,
+            "set_review": None,
             "set_rating": None,
             "track_review": None,
             "track_rating": None,
             "top_track": None,
             "top_set": None,
             "event_created": None,
-            "event_confirmed": None
-        })
-    
-    # Set ratings
-    set_ratings_query = select(Rating)
-    if user_ids:
-        set_ratings_query = set_ratings_query.where(Rating.user_id.in_(user_ids))
-    set_ratings_query = set_ratings_query.order_by(Rating.created_at.desc()).limit(limit * 3)
-    set_ratings_result = await db.execute(set_ratings_query)
-    set_ratings = set_ratings_result.scalars().all()
-    
-    for rating in set_ratings:
-        await db.refresh(rating, ["user", "set"])
-        rating_dict = RatingResponse.model_validate(rating).model_dump()
-        rating_dict["set"] = DJSetResponse.model_validate(rating.set).model_dump() if rating.set else None
-        activities.append({
-            "activity_type": "set_rating",
-            "created_at": rating.created_at,
-            "user": UserResponse.model_validate(rating.user).model_dump(),
-            "set_review": None,
-            "set_rating": rating_dict,
-            "track_review": None,
-            "track_rating": None,
-            "top_track": None,
-            "top_set": None,
-            "event_created": None,
-            "event_confirmed": None
-        })
-    
-    # Track reviews
-    track_reviews_query = select(TrackReview).where(TrackReview.is_public == True)
-    if user_ids:
-        track_reviews_query = track_reviews_query.where(TrackReview.user_id.in_(user_ids))
-    track_reviews_query = track_reviews_query.order_by(TrackReview.created_at.desc()).limit(limit * 3)
-    track_reviews_result = await db.execute(track_reviews_query)
-    track_reviews = track_reviews_result.scalars().all()
-    
-    for review in track_reviews:
-        await db.refresh(review, ["user", "track"])
-        review_dict = TrackReviewResponse.model_validate(review).model_dump()
-        review_dict["track"] = TrackResponse.model_validate(review.track).model_dump() if review.track else None
-        activities.append({
-            "activity_type": "track_review",
-            "created_at": review.created_at,
-            "user": UserResponse.model_validate(review.user).model_dump(),
-            "set_review": None,
-            "set_rating": None,
-            "track_review": review_dict,
-            "track_rating": None,
-            "top_track": None,
-            "top_set": None,
-            "event_created": None,
-            "event_confirmed": None
-        })
-    
-    # Track ratings
-    track_ratings_query = select(TrackRating)
-    if user_ids:
-        track_ratings_query = track_ratings_query.where(TrackRating.user_id.in_(user_ids))
-    track_ratings_query = track_ratings_query.order_by(TrackRating.created_at.desc()).limit(limit * 3)
-    track_ratings_result = await db.execute(track_ratings_query)
-    track_ratings = track_ratings_result.scalars().all()
-    
-    for rating in track_ratings:
-        await db.refresh(rating, ["user", "track"])
-        rating_dict = TrackRatingResponse.model_validate(rating).model_dump()
-        rating_dict["track"] = TrackResponse.model_validate(rating.track).model_dump() if rating.track else None
-        activities.append({
-            "activity_type": "track_rating",
-            "created_at": rating.created_at,
-            "user": UserResponse.model_validate(rating.user).model_dump(),
-            "set_review": None,
-            "set_rating": None,
-            "track_review": None,
-            "track_rating": rating_dict,
-            "top_track": None,
-            "top_set": None,
-            "event_created": None,
-            "event_confirmed": None
-        })
-    
-    # Top tracks (when users add tracks to their top 5)
-    top_tracks_query = select(UserTopTrack)
-    if user_ids:
-        top_tracks_query = top_tracks_query.where(UserTopTrack.user_id.in_(user_ids))
-    top_tracks_query = top_tracks_query.order_by(UserTopTrack.created_at.desc()).limit(limit * 3)
-    top_tracks_result = await db.execute(top_tracks_query)
-    top_tracks = top_tracks_result.scalars().all()
-    
-    for top_track in top_tracks:
-        await db.refresh(top_track, ["user", "track"])
-        activities.append({
-            "activity_type": "top_track",
-            "created_at": top_track.created_at,
-            "user": UserResponse.model_validate(top_track.user).model_dump(),
-            "set_review": None,
-            "set_rating": None,
-            "track_review": None,
-            "track_rating": None,
-            "top_track": {
+            "event_confirmed": None,
+        }
+
+    # Each section is wrapped in try/except so a missing table doesn't break the whole feed
+    try:
+        set_reviews_query = select(Review).where(Review.is_public == True)
+        if user_ids:
+            set_reviews_query = set_reviews_query.where(Review.user_id.in_(user_ids))
+        set_reviews_query = set_reviews_query.order_by(Review.created_at.desc()).limit(limit * 3)
+        set_reviews_result = await db.execute(set_reviews_query)
+        set_reviews = set_reviews_result.scalars().all()
+        
+        for review in set_reviews:
+            await db.refresh(review, ["user", "set"])
+            review_dict = ReviewResponse.model_validate(review).model_dump()
+            if review.set:
+                review_dict["set"] = DJSetResponse.model_validate(review.set).model_dump()
+            act = _base_activity("set_review", review.created_at, UserResponse.model_validate(review.user).model_dump())
+            act["set_review"] = review_dict
+            activities.append(act)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Activity feed: failed to load set reviews: {e}")
+
+    try:
+        set_ratings_query = select(Rating)
+        if user_ids:
+            set_ratings_query = set_ratings_query.where(Rating.user_id.in_(user_ids))
+        set_ratings_query = set_ratings_query.order_by(Rating.created_at.desc()).limit(limit * 3)
+        set_ratings_result = await db.execute(set_ratings_query)
+        set_ratings = set_ratings_result.scalars().all()
+        
+        for rating in set_ratings:
+            await db.refresh(rating, ["user", "set"])
+            rating_dict = RatingResponse.model_validate(rating).model_dump()
+            rating_dict["set"] = DJSetResponse.model_validate(rating.set).model_dump() if rating.set else None
+            act = _base_activity("set_rating", rating.created_at, UserResponse.model_validate(rating.user).model_dump())
+            act["set_rating"] = rating_dict
+            activities.append(act)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Activity feed: failed to load set ratings: {e}")
+
+    try:
+        track_reviews_query = select(TrackReview).where(TrackReview.is_public == True)
+        if user_ids:
+            track_reviews_query = track_reviews_query.where(TrackReview.user_id.in_(user_ids))
+        track_reviews_query = track_reviews_query.order_by(TrackReview.created_at.desc()).limit(limit * 3)
+        track_reviews_result = await db.execute(track_reviews_query)
+        track_reviews = track_reviews_result.scalars().all()
+        
+        for review in track_reviews:
+            await db.refresh(review, ["user", "track"])
+            review_dict = TrackReviewResponse.model_validate(review).model_dump()
+            review_dict["track"] = TrackResponse.model_validate(review.track).model_dump() if review.track else None
+            act = _base_activity("track_review", review.created_at, UserResponse.model_validate(review.user).model_dump())
+            act["track_review"] = review_dict
+            activities.append(act)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Activity feed: failed to load track reviews: {e}")
+
+    try:
+        track_ratings_query = select(TrackRating)
+        if user_ids:
+            track_ratings_query = track_ratings_query.where(TrackRating.user_id.in_(user_ids))
+        track_ratings_query = track_ratings_query.order_by(TrackRating.created_at.desc()).limit(limit * 3)
+        track_ratings_result = await db.execute(track_ratings_query)
+        track_ratings = track_ratings_result.scalars().all()
+        
+        for rating in track_ratings:
+            await db.refresh(rating, ["user", "track"])
+            rating_dict = TrackRatingResponse.model_validate(rating).model_dump()
+            rating_dict["track"] = TrackResponse.model_validate(rating.track).model_dump() if rating.track else None
+            act = _base_activity("track_rating", rating.created_at, UserResponse.model_validate(rating.user).model_dump())
+            act["track_rating"] = rating_dict
+            activities.append(act)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Activity feed: failed to load track ratings: {e}")
+
+    try:
+        top_tracks_query = select(UserTopTrack)
+        if user_ids:
+            top_tracks_query = top_tracks_query.where(UserTopTrack.user_id.in_(user_ids))
+        top_tracks_query = top_tracks_query.order_by(UserTopTrack.created_at.desc()).limit(limit * 3)
+        top_tracks_result = await db.execute(top_tracks_query)
+        top_tracks = top_tracks_result.scalars().all()
+        
+        for top_track in top_tracks:
+            await db.refresh(top_track, ["user", "track"])
+            act = _base_activity("top_track", top_track.created_at, UserResponse.model_validate(top_track.user).model_dump())
+            act["top_track"] = {
                 "track": TrackResponse.model_validate(top_track.track).model_dump(),
-                "order": top_track.order
-            },
-            "top_set": None,
-            "event_created": None,
-            "event_confirmed": None
-        })
-    
-    # Top sets (when users add sets to their top 5)
-    # We need to track when is_top_set changes, but since we don't have an update timestamp,
-    # we'll use created_at from UserSetLog when is_top_set=True
-    top_sets_query = select(UserSetLog).where(UserSetLog.is_top_set == True)
-    if user_ids:
-        top_sets_query = top_sets_query.where(UserSetLog.user_id.in_(user_ids))
-    top_sets_query = top_sets_query.order_by(UserSetLog.created_at.desc()).limit(limit * 3)
-    top_sets_result = await db.execute(top_sets_query)
-    top_sets = top_sets_result.scalars().all()
-    
-    for log in top_sets:
-        await db.refresh(log, ["user", "set"])
-        activities.append({
-            "activity_type": "top_set",
-            "created_at": log.created_at,
-            "user": UserResponse.model_validate(log.user).model_dump(),
-            "set_review": None,
-            "set_rating": None,
-            "track_review": None,
-            "track_rating": None,
-            "top_track": None,
-            "top_set": {
+                "order": top_track.order,
+            }
+            activities.append(act)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Activity feed: failed to load top tracks: {e}")
+
+    try:
+        top_sets_query = select(UserSetLog).where(UserSetLog.is_top_set == True)
+        if user_ids:
+            top_sets_query = top_sets_query.where(UserSetLog.user_id.in_(user_ids))
+        top_sets_query = top_sets_query.order_by(UserSetLog.created_at.desc()).limit(limit * 3)
+        top_sets_result = await db.execute(top_sets_query)
+        top_sets = top_sets_result.scalars().all()
+        
+        for log in top_sets:
+            await db.refresh(log, ["user", "set"])
+            act = _base_activity("top_set", log.created_at, UserResponse.model_validate(log.user).model_dump())
+            act["top_set"] = {
                 "set": DJSetResponse.model_validate(log.set).model_dump(),
                 "log": LogResponse.model_validate(log).model_dump(),
-                "order": log.top_set_order
-            },
-            "event_created": None,
-            "event_confirmed": None
-        })
-    
-    # Event creation (when users create events)
-    events_query = select(Event)
-    if user_ids:
-        events_query = events_query.where(Event.created_by_id.in_(user_ids))
-    events_query = events_query.order_by(Event.created_at.desc()).limit(limit * 3)
-    events_result = await db.execute(events_query)
-    events = events_result.scalars().all()
-    
-    for event in events:
-        await db.refresh(event, ["created_by"])
-        activities.append({
-            "activity_type": "event_created",
-            "created_at": event.created_at,
-            "user": UserResponse.model_validate(event.created_by).model_dump(),
-            "set_review": None,
-            "set_rating": None,
-            "track_review": None,
-            "track_rating": None,
-            "top_track": None,
-            "top_set": None,
-            "event_created": {
-                "event": EventResponse.model_validate(event).model_dump()
-            },
-            "event_confirmed": None
-        })
-    
-    # Event confirmations (when users confirm they attended events)
-    event_confirmations_query = select(EventConfirmation)
-    if user_ids:
-        event_confirmations_query = event_confirmations_query.where(EventConfirmation.user_id.in_(user_ids))
-    event_confirmations_query = event_confirmations_query.order_by(EventConfirmation.created_at.desc()).limit(limit * 3)
-    event_confirmations_result = await db.execute(event_confirmations_query)
-    event_confirmations = event_confirmations_result.scalars().all()
-    
-    for confirmation in event_confirmations:
-        await db.refresh(confirmation, ["user", "event"])
-        activities.append({
-            "activity_type": "event_confirmed",
-            "created_at": confirmation.created_at,
-            "user": UserResponse.model_validate(confirmation.user).model_dump(),
-            "set_review": None,
-            "set_rating": None,
-            "track_review": None,
-            "track_rating": None,
-            "top_track": None,
-            "top_set": None,
-            "event_created": None,
-            "event_confirmed": {
-                "event": EventResponse.model_validate(confirmation.event).model_dump()
+                "order": log.top_set_order,
             }
-        })
+            activities.append(act)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Activity feed: failed to load top sets: {e}")
+
+    try:
+        events_query = select(Event)
+        if user_ids:
+            events_query = events_query.where(Event.created_by_id.in_(user_ids))
+        events_query = events_query.order_by(Event.created_at.desc()).limit(limit * 3)
+        events_result = await db.execute(events_query)
+        events = events_result.scalars().all()
+        
+        for event in events:
+            await db.refresh(event, ["created_by"])
+            act = _base_activity("event_created", event.created_at, UserResponse.model_validate(event.created_by).model_dump())
+            act["event_created"] = {"event": EventResponse.model_validate(event).model_dump()}
+            activities.append(act)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Activity feed: failed to load events: {e}")
+
+    try:
+        event_confirmations_query = select(EventConfirmation)
+        if user_ids:
+            event_confirmations_query = event_confirmations_query.where(EventConfirmation.user_id.in_(user_ids))
+        event_confirmations_query = event_confirmations_query.order_by(EventConfirmation.created_at.desc()).limit(limit * 3)
+        event_confirmations_result = await db.execute(event_confirmations_query)
+        event_confirmations = event_confirmations_result.scalars().all()
+        
+        for confirmation in event_confirmations:
+            await db.refresh(confirmation, ["user", "event"])
+            act = _base_activity("event_confirmed", confirmation.created_at, UserResponse.model_validate(confirmation.user).model_dump())
+            act["event_confirmed"] = {"event": EventResponse.model_validate(confirmation.event).model_dump()}
+            activities.append(act)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Activity feed: failed to load event confirmations: {e}")
     
     # Sort all activities by created_at (most recent first)
     activities.sort(key=lambda x: x["created_at"], reverse=True)

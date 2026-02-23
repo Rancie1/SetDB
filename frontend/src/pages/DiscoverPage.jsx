@@ -44,7 +44,8 @@ const DiscoverPage = () => {
         pages,
       });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load activity feed');
+      console.error('Activity feed error:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load activity feed');
     } finally {
       setLoading(false);
     }
