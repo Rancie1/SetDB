@@ -87,7 +87,7 @@ const LinkToLiveEventForm = ({ set, onSuccess, onCancel, loading: externalLoadin
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by event name, venue, or DJ..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -100,18 +100,18 @@ const LinkToLiveEventForm = ({ set, onSuccess, onCancel, loading: externalLoadin
         )}
 
         {liveEvents.length > 0 && (
-          <div className="border border-gray-200 rounded-md max-h-60 overflow-y-auto">
+          <div className="bg-surface-700 border border-white/10 rounded-xl max-h-60 overflow-y-auto">
             {liveEvents.map((event) => (
               <div
                 key={event.id}
-                className={`p-3 border-b border-gray-200 last:border-b-0 cursor-pointer hover:bg-blue-100 ${
-                  selectedEventId === event.id ? 'bg-blue-200' : ''
+                className={`p-3 border-b border-white/5 last:border-b-0 cursor-pointer hover:bg-surface-600 transition-colors ${
+                  selectedEventId === event.id ? 'bg-primary-600/20' : ''
                 }`}
                 onClick={() => setSelectedEventId(event.id)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-slate-200">
                       {event.event_name || event.title}
                     </div>
                     <div className="text-sm text-gray-600">

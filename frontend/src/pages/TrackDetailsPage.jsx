@@ -311,8 +311,8 @@ const TrackDetailsPage = () => {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="animate-pulse">
-          <div className="h-64 bg-gray-200 rounded-lg mb-6"></div>
-          <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div className="h-64 bg-surface-700 rounded-xl mb-6"></div>
+          <div className="h-8 bg-surface-700 rounded w-1/3 mb-4"></div>
         </div>
       </div>
     );
@@ -322,8 +322,8 @@ const TrackDetailsPage = () => {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Track Not Found</h2>
-          <p className="text-gray-600">{error || 'The track you\'re looking for doesn\'t exist.'}</p>
+          <h2 className="text-2xl font-bold text-slate-100 mb-2">Track Not Found</h2>
+          <p className="text-slate-400">{error || "The track you're looking for doesn't exist."}</p>
         </div>
       </div>
     );
@@ -332,33 +332,25 @@ const TrackDetailsPage = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Track Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+      <div className="bg-surface-800 rounded-xl border border-white/5 mb-6">
         <div className="flex flex-col md:flex-row gap-6 p-6">
           {/* Thumbnail */}
           {track.thumbnail_url && (
             <div className="flex-shrink-0">
-              <img
-                src={track.thumbnail_url}
-                alt={track.track_name}
-                className="w-48 h-48 rounded-lg object-cover"
-              />
+              <img src={track.thumbnail_url} alt={track.track_name} className="w-48 h-48 rounded-xl object-cover" />
             </div>
           )}
-          
+
           {/* Track Info */}
           <div className="flex-1">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-              {track.track_name}
-            </h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-100 mb-2">{track.track_name}</h1>
             {track.artist_name && (
-              <p className="text-xl text-gray-600 mb-4">
-                <ArtistLink name={track.artist_name} />
-              </p>
+              <p className="text-lg text-slate-400 mb-4"><ArtistLink name={track.artist_name} /></p>
             )}
-            
+
             <div className="flex flex-wrap items-center gap-4 mb-4">
               {track.duration_ms && (
-                <span className="text-sm text-gray-600">⏱️ {formatDuration(track.duration_ms)}</span>
+                <span className="text-sm text-slate-400">{formatDuration(track.duration_ms)}</span>
               )}
               {track.soundcloud_url && (
                 <a
@@ -404,14 +396,14 @@ const TrackDetailsPage = () => {
                     <button
                       onClick={() => setShowTopTrackSelector(true)}
                       disabled={settingTopTrack}
-                      className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-md disabled:opacity-50"
+                      className="px-3 py-1 bg-surface-700 hover:bg-surface-600 text-slate-300 text-sm font-medium rounded-lg disabled:opacity-50 transition-colors cursor-pointer"
                     >
                       Change Position
                     </button>
                     <button
                       onClick={handleUnsetTopTrack}
                       disabled={settingTopTrack}
-                      className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-medium rounded-md disabled:opacity-50"
+                      className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm font-medium rounded-lg disabled:opacity-50 transition-colors cursor-pointer"
                     >
                       Remove from Top
                     </button>
@@ -426,18 +418,18 @@ const TrackDetailsPage = () => {
                 )}
                 
                 {showTopTrackSelector && (
-                  <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                    <p className="text-sm text-gray-700 mb-2">Select position (1-5):</p>
+                  <div className="mt-2 p-3 bg-surface-700 rounded-xl">
+                    <p className="text-sm text-slate-400 mb-2">Select position (1-5):</p>
                     <div className="flex gap-2">
                       {[1, 2, 3, 4, 5].map((order) => (
                         <button
                           key={order}
                           onClick={() => handleSetTopTrack(order)}
                           disabled={settingTopTrack}
-                          className={`px-3 py-1 rounded-md text-sm font-medium ${
+                          className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                             track.is_top_track && track.top_track_order === order
                               ? 'bg-primary-600 text-white'
-                              : 'bg-white border border-gray-300 hover:bg-gray-50'
+                              : 'bg-surface-600 hover:bg-surface-500 text-slate-300'
                           } disabled:opacity-50`}
                         >
                           #{order}
@@ -445,7 +437,7 @@ const TrackDetailsPage = () => {
                       ))}
                       <button
                         onClick={() => setShowTopTrackSelector(false)}
-                        className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-md"
+                        className="px-3 py-1 bg-surface-600 hover:bg-surface-500 text-slate-400 text-sm font-medium rounded-lg transition-colors cursor-pointer"
                       >
                         Cancel
                       </button>
@@ -462,12 +454,11 @@ const TrackDetailsPage = () => {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
           {/* Rating Section - Custom for tracks */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold mb-4">Rate this Track</h3>
-            {/* We'll create a track-specific rating component, but for now use a simple version */}
+          <div className="bg-surface-800 rounded-xl border border-white/5 p-6">
+            <h3 className="text-lg font-semibold mb-4 text-slate-100">Rate this Track</h3>
             {isAuthenticated ? (
               <div>
-                <p className="text-sm text-gray-600 mb-3">Your Rating:</p>
+                <p className="text-sm text-slate-400 mb-3">Your Rating:</p>
                 <div className="flex items-center" onMouseLeave={() => setHoveredRating(null)}>
                   {[1, 2, 3, 4, 5].map((star) => {
                     const displayRating = hoveredRating !== null ? hoveredRating : (userRating?.rating || 0);
@@ -488,7 +479,7 @@ const TrackDetailsPage = () => {
                     return (
                       <div key={star} className="relative" style={{ width: '2.5rem', height: '2.5rem' }}>
                         {/* Background empty star */}
-                        <div className="absolute inset-0 text-gray-300 text-4xl pointer-events-none flex items-center justify-center">
+                        <div className="absolute inset-0 text-slate-600 text-4xl pointer-events-none flex items-center justify-center">
                           ★
                         </div>
                         {/* Half-filled star (clip left half) */}
@@ -518,25 +509,23 @@ const TrackDetailsPage = () => {
                     );
                   })}
                   {(userRating || hoveredRating !== null) && (
-                    <span className="ml-4 text-lg font-medium text-gray-700">
+                    <span className="ml-4 text-lg font-medium text-slate-300">
                       {(hoveredRating !== null ? hoveredRating : userRating?.rating || 0).toFixed(1)} / 5.0
                     </span>
                   )}
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-600">
-                <a href="/login" className="text-primary-600 hover:text-primary-700 font-medium">
-                  Log in
-                </a>{' '}
+              <p className="text-sm text-slate-400">
+                <a href="/login" className="text-primary-400 hover:text-primary-300 font-medium">Log in</a>{' '}
                 to rate this track
               </p>
             )}
-            
+
             {ratingStats && ratingStats.total_ratings > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-2xl font-bold">{ratingStats.average_rating?.toFixed(1)}</p>
-                <p className="text-sm text-gray-600">
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <p className="text-2xl font-bold text-slate-100">{ratingStats.average_rating?.toFixed(1)}</p>
+                <p className="text-sm text-slate-400">
                   {ratingStats.total_ratings} {ratingStats.total_ratings === 1 ? 'rating' : 'ratings'}
                 </p>
               </div>
@@ -545,8 +534,8 @@ const TrackDetailsPage = () => {
 
           {/* Review Form - Custom for tracks */}
           {showReviewForm && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold mb-4">
+            <div className="bg-surface-800 rounded-xl border border-white/5 p-6">
+              <h3 className="text-lg font-semibold mb-4 text-slate-100">
                 {userReview ? 'Edit Review' : 'Write a Review'}
               </h3>
               <form onSubmit={async (e) => {
@@ -581,7 +570,7 @@ const TrackDetailsPage = () => {
                   defaultValue={userReview?.content || ''}
                   placeholder="Share your thoughts about this track..."
                   rows={6}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-4"
+                  className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none mb-4"
                   required
                 />
                 <div className="flex items-center space-x-6 mb-4">
@@ -592,7 +581,7 @@ const TrackDetailsPage = () => {
                       defaultChecked={userReview?.contains_spoilers || false}
                       className="mr-2"
                     />
-                    <span className="text-sm text-gray-700">Contains spoilers</span>
+                    <span className="text-sm text-slate-300">Contains spoilers</span>
                   </label>
                   <label className="flex items-center">
                     <input
@@ -601,20 +590,20 @@ const TrackDetailsPage = () => {
                       defaultChecked={userReview?.is_public ?? true}
                       className="mr-2"
                     />
-                    <span className="text-sm text-gray-700">Public review</span>
+                    <span className="text-sm text-slate-300">Public review</span>
                   </label>
                 </div>
                 <div className="flex items-center space-x-3">
                   <button
                     type="submit"
-                    className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-2 rounded-md"
+                    className="bg-primary-600 hover:bg-primary-500 text-white font-medium px-6 py-2 rounded-lg transition-colors cursor-pointer"
                   >
                     {userReview ? 'Update Review' : 'Post Review'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowReviewForm(false)}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-6 py-2 rounded-md"
+                    className="bg-surface-700 hover:bg-surface-600 text-slate-300 font-medium px-6 py-2 rounded-lg transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -630,7 +619,7 @@ const TrackDetailsPage = () => {
               {isAuthenticated && (
                 <button
                   onClick={() => setShowReviewForm(!showReviewForm)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-md"
+                  className="px-4 py-2 bg-surface-700 hover:bg-surface-600 text-slate-300 font-medium rounded-lg transition-colors cursor-pointer"
                 >
                   {userReview ? 'Edit Review' : 'Write Review'}
                 </button>
@@ -640,13 +629,13 @@ const TrackDetailsPage = () => {
             {reviewsLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-32"></div>
+                  <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-32"></div>
                 ))}
               </div>
             ) : reviews.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-                <p className="text-gray-600 mb-2">No reviews yet</p>
-                <p className="text-gray-400 text-sm">
+              <div className="bg-surface-800 border border-white/5 rounded-xl p-8 text-center">
+                <p className="text-slate-400 mb-2">No reviews yet</p>
+                <p className="text-slate-500 text-sm">
                   {isAuthenticated
                     ? 'Be the first to review this track'
                     : 'Log in to write a review'}
@@ -680,31 +669,31 @@ const TrackDetailsPage = () => {
             </div>
 
             {showLinkForm && (
-              <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+              <div className="bg-surface-800 rounded-xl border border-white/5 p-4 mb-4">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search for sets..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-2"
+                  className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none mb-2"
                 />
                 
                 {searching && (
-                  <p className="text-sm text-gray-500">Searching...</p>
+                  <p className="text-sm text-slate-500">Searching...</p>
                 )}
                 
                 {searchResults.length > 0 && (
-                  <div className="border border-gray-200 rounded-md max-h-60 overflow-y-auto mb-2">
+                  <div className="border border-white/10 rounded-xl max-h-60 overflow-y-auto mb-2 bg-surface-700">
                     {searchResults.map((set) => (
                       <div
                         key={set.id}
                         onClick={() => setSelectedSetId(set.id)}
-                        className={`p-3 border-b border-gray-200 last:border-b-0 cursor-pointer hover:bg-primary-50 ${
-                          selectedSetId === set.id ? 'bg-primary-100' : ''
+                        className={`p-3 border-b border-white/5 last:border-b-0 cursor-pointer hover:bg-surface-600 transition-colors ${
+                          selectedSetId === set.id ? 'bg-primary-600/20' : ''
                         }`}
                       >
-                        <div className="font-medium text-gray-900">{set.title}</div>
-                        <div className="text-sm text-gray-600">{set.dj_name}</div>
+                        <div className="font-medium text-slate-100 text-sm">{set.title}</div>
+                        <div className="text-xs text-slate-400">{set.dj_name}</div>
                       </div>
                     ))}
                   </div>
@@ -715,7 +704,7 @@ const TrackDetailsPage = () => {
                   const hasRecording = selectedSet?.recording_url;
                   return hasRecording && (
                     <div className="mb-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
                         Timestamp (HH:MM)
                       </label>
                       <input
@@ -724,9 +713,9 @@ const TrackDetailsPage = () => {
                         onChange={(e) => setTimestampInput(e.target.value)}
                         pattern="[0-9]+:[0-5][0-9]"
                         placeholder="e.g., 1:30"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                       />
-                      <p className="text-xs text-gray-500 mt-1">When in the recording this track starts (optional, format: HH:MM)</p>
+                      <p className="text-xs text-slate-500 mt-1">When in the recording this track starts (optional, format: HH:MM)</p>
                     </div>
                   );
                 })()}
@@ -744,11 +733,11 @@ const TrackDetailsPage = () => {
             {linkedSetsLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[1, 2].map((i) => (
-                  <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-48"></div>
+                  <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-48"></div>
                 ))}
               </div>
             ) : linkedSets.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+              <div className="bg-surface-800 border border-white/5 rounded-xl p-8 text-center">
                 <p className="text-gray-600 mb-2">No sets linked yet</p>
                 <p className="text-gray-400 text-sm">
                   {isAuthenticated
@@ -785,12 +774,12 @@ const TrackDetailsPage = () => {
               {relatedLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-16"></div>
+                    <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-16"></div>
                   ))}
                 </div>
               ) : relatedTracks.length === 0 ? (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                  <p className="text-gray-500 text-sm">No other tracks by this artist yet, use the tracks page to discover more by {track.artist_name}</p>
+                <div className="bg-surface-800 border border-white/5 rounded-xl p-6 text-center">
+                  <p className="text-slate-500 text-sm">No other tracks by this artist yet, use the tracks page to discover more by {track.artist_name}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -798,7 +787,7 @@ const TrackDetailsPage = () => {
                     <Link
                       key={relTrack.id}
                       to={`/tracks/${relTrack.id}`}
-                      className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-sm hover:border-primary-200 transition-all"
+                      className="bg-surface-800 rounded-xl border border-white/5 p-3 hover:border-primary-500/30 hover:bg-surface-700 transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         {relTrack.thumbnail_url && (
@@ -809,9 +798,9 @@ const TrackDetailsPage = () => {
                           />
                         )}
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{relTrack.track_name}</h4>
+                          <h4 className="font-semibold text-sm text-slate-100 line-clamp-1">{relTrack.track_name}</h4>
                           {relTrack.average_rating && (
-                            <span className="text-xs text-yellow-600">⭐ {relTrack.average_rating.toFixed(1)}</span>
+                            <span className="text-xs text-accent-400">{relTrack.average_rating.toFixed(1)}</span>
                           )}
                         </div>
                       </div>
@@ -826,30 +815,30 @@ const TrackDetailsPage = () => {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Track Stats */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold mb-4">Track Info</h3>
+          <div className="bg-surface-800 rounded-xl border border-white/5 p-6">
+            <h3 className="text-lg font-semibold mb-4 text-slate-100">Track Info</h3>
             <dl className="space-y-3 text-sm">
               {track.artist_name && (
                 <div>
-                  <dt className="text-gray-500">Artist</dt>
-                  <dd className="font-medium text-gray-900">
+                  <dt className="text-slate-500">Artist</dt>
+                  <dd className="font-medium text-slate-200">
                     <ArtistLink name={track.artist_name} />
                   </dd>
                 </div>
               )}
               {track.duration_ms && (
                 <div>
-                  <dt className="text-gray-500">Duration</dt>
-                  <dd className="font-medium text-gray-900">{formatDuration(track.duration_ms)}</dd>
+                  <dt className="text-slate-500">Duration</dt>
+                  <dd className="font-medium text-slate-200">{formatDuration(track.duration_ms)}</dd>
                 </div>
               )}
               {track.average_rating && (
                 <div>
-                  <dt className="text-gray-500">Average Rating</dt>
-                  <dd className="font-medium text-gray-900">
-                    ⭐ {track.average_rating.toFixed(1)} / 5.0
+                  <dt className="text-slate-500">Average Rating</dt>
+                  <dd className="font-medium text-slate-200">
+                    {track.average_rating.toFixed(1)} / 5.0
                     {track.rating_count > 0 && (
-                      <span className="text-gray-500 ml-2">
+                      <span className="text-slate-500 ml-2">
                         ({track.rating_count} {track.rating_count === 1 ? 'rating' : 'ratings'})
                       </span>
                     )}
@@ -857,12 +846,12 @@ const TrackDetailsPage = () => {
                 </div>
               )}
               <div>
-                <dt className="text-gray-500">Linked Sets</dt>
-                <dd className="font-medium text-gray-900">{track.linked_sets_count || 0}</dd>
+                <dt className="text-slate-500">Linked Sets</dt>
+                <dd className="font-medium text-slate-200">{track.linked_sets_count || 0}</dd>
               </div>
               <div>
-                <dt className="text-gray-500">Added</dt>
-                <dd className="font-medium text-gray-900">
+                <dt className="text-slate-500">Added</dt>
+                <dd className="font-medium text-slate-200">
                   {new Date(track.created_at).toLocaleDateString()}
                 </dd>
               </div>

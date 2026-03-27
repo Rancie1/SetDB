@@ -389,40 +389,29 @@ const SetDetailsPage = () => {
 
   const getSourceColor = (sourceType) => {
     switch (sourceType?.toLowerCase()) {
-      case 'youtube':
-        return 'bg-red-100 text-red-800';
-      case 'soundcloud':
-        return 'bg-orange-100 text-orange-800';
-      case 'live':
-        return 'bg-purple-100 text-purple-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'youtube': return 'bg-red-500/20 text-red-300 border border-red-500/30';
+      case 'soundcloud': return 'bg-orange-500/20 text-orange-300 border border-orange-500/30';
+      case 'live': return 'bg-violet-500/20 text-violet-300 border border-violet-500/30';
+      default: return 'bg-white/5 text-slate-400 border border-white/10';
     }
   };
 
-  const getSetTypeLabel = (set) => {
-    if (set.source_type?.toLowerCase() === 'live') {
-      return 'Live Set';
-    }
-    return 'Upload';
-  };
+  const getSetTypeLabel = (set) => set.source_type?.toLowerCase() === 'live' ? 'Live Set' : 'Upload';
 
   const getSetTypeColor = (set) => {
-    if (set.source_type?.toLowerCase() === 'live') {
-      return 'bg-purple-100 text-purple-800 border-purple-300';
-    }
-    return 'bg-gray-100 text-gray-800 border-gray-300';
+    if (set.source_type?.toLowerCase() === 'live') return 'bg-violet-500/20 text-violet-300 border border-violet-500/30';
+    return 'bg-white/5 text-slate-400 border border-white/10';
   };
 
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
-          <div className="h-64 bg-gray-200 rounded mb-6"></div>
+          <div className="h-8 bg-surface-700 rounded w-3/4 mb-4"></div>
+          <div className="h-64 bg-surface-700 rounded mb-6"></div>
           <div className="space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-full"></div>
-            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+            <div className="h-4 bg-surface-700 rounded w-full"></div>
+            <div className="h-4 bg-surface-700 rounded w-5/6"></div>
           </div>
         </div>
       </div>
@@ -432,13 +421,10 @@ const SetDetailsPage = () => {
   if (error || !currentSet) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl">
           {error || 'Set not found'}
         </div>
-        <Link
-          to="/"
-          className="mt-4 inline-block text-primary-600 hover:text-primary-700"
-        >
+        <Link to="/" className="mt-4 inline-block text-primary-400 hover:text-primary-300">
           ← Back to Discover
         </Link>
       </div>
@@ -450,20 +436,17 @@ const SetDetailsPage = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back Button */}
-      <Link
-        to="/"
-        className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6"
-      >
+      <Link to="/" className="inline-flex items-center text-slate-400 hover:text-slate-100 mb-6 transition-colors">
         <span className="mr-2">←</span>
         Back to Discover
       </Link>
 
       {/* Hero Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
+      <div className="bg-surface-800 rounded-xl border border-white/5 overflow-hidden mb-8">
         <div className="md:flex">
           {/* Thumbnail */}
           <div className="md:w-1/3 lg:w-1/4">
-            <div className="aspect-video md:aspect-square bg-gray-200 relative">
+            <div className="aspect-video md:aspect-square bg-surface-700 relative">
               {currentSet.thumbnail_url ? (
                 <img
                   src={`${currentSet.thumbnail_url}${currentSet.thumbnail_url.includes('?') ? '&' : '?'}v=${new Date(currentSet.updated_at || currentSet.created_at).getTime()}`}
@@ -490,8 +473,8 @@ const SetDetailsPage = () => {
                   }}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  <span className="text-6xl">🎧</span>
+                <div className="w-full h-full flex items-center justify-center bg-surface-700">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-16 h-16 text-slate-600"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
                 </div>
               )}
               <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
@@ -517,25 +500,19 @@ const SetDetailsPage = () => {
 
           {/* Content */}
           <div className="md:w-2/3 lg:w-3/4 p-6 md:p-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-100 mb-2">
               {currentSet.title}
             </h1>
-            <p className="text-xl text-gray-600 mb-4">
+            <p className="text-lg text-slate-400 mb-4">
               <ArtistLink name={currentSet.dj_name} />
             </p>
 
             {/* Live set with recording indicator */}
             {currentSet.source_type?.toLowerCase() === 'live' && currentSet.recording_url && (
-              <div className="mb-4 p-3 rounded-lg bg-purple-50 border border-purple-200">
-                <p className="text-sm font-medium text-purple-800 mb-1">
-                  🎵 Recording available
-                </p>
-                <a
-                  href={currentSet.recording_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-purple-600 hover:text-purple-800 underline"
-                >
+              <div className="mb-4 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
+                <p className="text-sm font-medium text-violet-300 mb-1">Recording available</p>
+                <a href={currentSet.recording_url} target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-violet-400 hover:text-violet-300 underline">
                   Listen to recording →
                 </a>
               </div>
@@ -552,8 +529,8 @@ const SetDetailsPage = () => {
               // Show helpful message if user is creator but set can't be marked as live
               if (isAuthenticated && isCreator && !isYouTubeOrSoundCloud && isImportedSet) {
                 return (
-                  <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <p className="text-sm text-yellow-800">
+                  <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                    <p className="text-sm text-yellow-300">
                       <strong>Cannot mark as live:</strong> Only YouTube and SoundCloud sets can be converted to live sets.
                       <br />
                       Current set type: <strong>{currentSet.source_type || 'unknown'}</strong>
@@ -565,10 +542,8 @@ const SetDetailsPage = () => {
               // Show message if user is not the creator
               if (isAuthenticated && !isCreator && isYouTubeOrSoundCloud) {
                 return (
-                  <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-md">
-                    <p className="text-sm text-gray-600">
-                      Only the creator of this set can mark it as live.
-                    </p>
+                  <div className="mb-6 p-4 bg-surface-700 border border-white/5 rounded-xl">
+                    <p className="text-sm text-slate-400">Only the creator of this set can mark it as live.</p>
                   </div>
                 );
               }
@@ -592,7 +567,7 @@ const SetDetailsPage = () => {
                   </div>
                   
                   {/* Divider */}
-                  <div className="border-t border-gray-200 my-4"></div>
+                  <div className="border-t border-white/5 my-4"></div>
                   
                   {/* Create Live Event button */}
                   {!showCreateLiveEventForm ? (
@@ -620,7 +595,7 @@ const SetDetailsPage = () => {
             })()}
 
             {/* Metadata */}
-            <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-gray-600">
+            <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-slate-400">
               {formatDuration(currentSet.duration_minutes) && (
                 <span className="flex items-center">
                   <span className="mr-1">⏱</span>
@@ -654,7 +629,7 @@ const SetDetailsPage = () => {
             {/* Description */}
             {currentSet.description && (
               <div className="mb-6">
-                <p className="text-gray-700 whitespace-pre-wrap">{currentSet.description}</p>
+                <p className="text-slate-300 whitespace-pre-wrap">{currentSet.description}</p>
               </div>
             )}
 
@@ -689,7 +664,7 @@ const SetDetailsPage = () => {
                         <button
                           onClick={handleRemoveFromSeen}
                           disabled={loggingSet}
-                          className="inline-flex items-center px-4 py-2 bg-green-100 hover:bg-green-200 text-green-800 font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="inline-flex items-center px-4 py-2 bg-accent-500/20 hover:bg-accent-500/30 text-accent-400 font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           {loggingSet ? 'Removing...' : `✓ Marked as ${actionLabel}`}
                         </button>
@@ -704,14 +679,14 @@ const SetDetailsPage = () => {
                               <button
                                 onClick={handleUnsetTopSet}
                                 disabled={settingTopSet}
-                                className="text-sm text-gray-600 hover:text-gray-800 underline disabled:opacity-50"
+                                className="text-sm text-slate-400 hover:text-slate-200 underline disabled:opacity-50"
                               >
                                 Remove
                               </button>
                               <button
                                 onClick={() => setShowTopSetSelector(!showTopSetSelector)}
                                 disabled={settingTopSet}
-                                className="text-sm text-primary-600 hover:text-primary-700 underline disabled:opacity-50"
+                                className="text-sm text-primary-400 hover:text-primary-300 underline disabled:opacity-50"
                               >
                                 Change Position
                               </button>
@@ -720,24 +695,24 @@ const SetDetailsPage = () => {
                             <button
                               onClick={() => setShowTopSetSelector(!showTopSetSelector)}
                               disabled={settingTopSet}
-                              className="text-sm text-primary-600 hover:text-primary-700 underline disabled:opacity-50"
+                              className="text-sm text-primary-400 hover:text-primary-300 underline disabled:opacity-50"
                             >
-                              ⭐ Add to Top Sets
+                              Add to Top Sets
                             </button>
                           )}
                           
                           {showTopSetSelector && (
                             <div className="flex items-center space-x-2">
-                              <span className="text-sm text-gray-600">Position:</span>
+                              <span className="text-sm text-slate-400">Position:</span>
                               {[1, 2, 3, 4, 5].map((order) => (
                                 <button
                                   key={order}
                                   onClick={() => handleSetTopSet(order)}
                                   disabled={settingTopSet}
-                                  className={`px-3 py-1 text-sm rounded-md font-medium disabled:opacity-50 ${
+                                  className={`px-3 py-1 text-sm rounded-lg font-medium disabled:opacity-50 transition-colors cursor-pointer ${
                                     userLog.is_top_set && userLog.top_set_order === order
                                       ? 'bg-primary-600 text-white'
-                                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                      : 'bg-surface-700 hover:bg-surface-600 text-slate-300'
                                   }`}
                                 >
                                   {order}
@@ -745,7 +720,7 @@ const SetDetailsPage = () => {
                               ))}
                               <button
                                 onClick={() => setShowTopSetSelector(false)}
-                                className="text-sm text-gray-600 hover:text-gray-800 underline"
+                                className="text-sm text-slate-400 hover:text-slate-200 underline cursor-pointer"
                               >
                                 Cancel
                               </button>
@@ -769,7 +744,7 @@ const SetDetailsPage = () => {
               {isAuthenticated && (
                 <button
                   onClick={() => setShowReviewForm(!showReviewForm)}
-                  className="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-md"
+                  className="inline-flex items-center px-4 py-2 bg-surface-700 hover:bg-surface-600 text-slate-300 font-medium rounded-lg transition-colors cursor-pointer"
                 >
                   {userReview ? 'Edit Review' : 'Write Review'}
                 </button>
@@ -829,13 +804,13 @@ const SetDetailsPage = () => {
             {trackTagsLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-16"></div>
+                  <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-16"></div>
                 ))}
               </div>
             ) : trackTags.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-                <p className="text-gray-600 mb-2">No track tags yet</p>
-                <p className="text-gray-400 text-sm">
+              <div className="bg-surface-800 border border-white/5 rounded-xl p-8 text-center">
+                <p className="text-slate-400 mb-2">No track tags yet</p>
+                <p className="text-slate-500 text-sm">
                   {isAuthenticated
                     ? 'Add tracks that were played in this set'
                     : 'Log in to add track tags'}
@@ -863,24 +838,24 @@ const SetDetailsPage = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold">Reviews</h2>
               {reviews.length > 0 && (
-                <span className="text-sm text-gray-600">{reviews.length} reviews</span>
+                <span className="text-sm text-slate-400">{reviews.length} reviews</span>
               )}
             </div>
 
             {reviewsLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-32"></div>
+                  <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-32"></div>
                 ))}
               </div>
             ) : reviewsError ? (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl">
                 {reviewsError}
               </div>
             ) : reviews.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-                <p className="text-gray-600 mb-2">No reviews yet</p>
-                <p className="text-sm text-gray-500">
+              <div className="bg-surface-800 border border-white/5 rounded-xl p-8 text-center">
+                <p className="text-slate-400 mb-2">No reviews yet</p>
+                <p className="text-sm text-slate-500">
                   {isAuthenticated
                     ? 'Be the first to write a review!'
                     : 'Log in to write the first review'}
@@ -903,26 +878,26 @@ const SetDetailsPage = () => {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Additional Info */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold mb-4">Details</h3>
+          <div className="bg-surface-800 rounded-xl border border-white/5 p-6">
+            <h3 className="text-lg font-semibold mb-4 text-slate-100">Details</h3>
             <dl className="space-y-3 text-sm">
               <div>
-                <dt className="text-gray-500">Source</dt>
-                <dd className="font-medium text-gray-900 capitalize">
+                <dt className="text-slate-500">Source</dt>
+                <dd className="font-medium text-slate-100 capitalize">
                   {currentSet.source_type || 'Unknown'}
                 </dd>
               </div>
               {currentSet.source_id && (
                 <div>
-                  <dt className="text-gray-500">Source ID</dt>
-                  <dd className="font-medium text-gray-900 font-mono text-xs">
+                  <dt className="text-slate-500">Source ID</dt>
+                  <dd className="font-medium text-slate-100 font-mono text-xs">
                     {currentSet.source_id}
                   </dd>
                 </div>
               )}
               <div>
-                <dt className="text-gray-500">Added</dt>
-                <dd className="font-medium text-gray-900">
+                <dt className="text-slate-500">Added</dt>
+                <dd className="font-medium text-slate-100">
                   {new Date(currentSet.created_at).toLocaleDateString()}
                 </dd>
               </div>

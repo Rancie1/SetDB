@@ -219,7 +219,7 @@ const RatingDisplay = ({ setId, ratingStats, userRating, onRatingChange }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div className="bg-surface-800 rounded-xl border border-white/5 p-6">
       <h3 className="text-lg font-semibold mb-4">Rate this Set</h3>
 
       {/* User Rating Section */}
@@ -244,7 +244,7 @@ const RatingDisplay = ({ setId, ratingStats, userRating, onRatingChange }) => {
           </p>
         </div>
       ) : (
-        <div className="mb-6 p-4 bg-gray-50 rounded-md">
+        <div className="mb-6 p-4 bg-surface-700 rounded-xl">
           <p className="text-sm text-gray-600">
             <a href="/login" className="text-primary-600 hover:text-primary-700 font-medium">
               Log in
@@ -256,7 +256,7 @@ const RatingDisplay = ({ setId, ratingStats, userRating, onRatingChange }) => {
 
       {/* Rating Stats */}
       {ratingStats && ratingStats.total_ratings > 0 && (
-        <div className="border-t border-gray-200 pt-4">
+        <div className="border-t border-white/5 pt-4">
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-2xl font-bold">{ratingStats.average_rating?.toFixed(1)}</p>

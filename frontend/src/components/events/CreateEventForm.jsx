@@ -57,7 +57,7 @@ const CreateEventForm = ({ onCancel, onSubmit }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="bg-surface-800 rounded-xl border border-white/5 p-6">
       <h2 className="text-2xl font-bold mb-6">Create New Event</h2>
       
       {error && (
@@ -76,7 +76,7 @@ const CreateEventForm = ({ onCancel, onSubmit }) => {
             {...register('title', { required: 'Title is required' })}
             type="text"
             id="title"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             placeholder="e.g., SUNSHiiNE Presents GMX"
           />
           {errors.title && (
@@ -93,7 +93,7 @@ const CreateEventForm = ({ onCancel, onSubmit }) => {
             {...register('dj_name', { required: 'Company name is required' })}
             type="text"
             id="dj_name"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             placeholder="e.g., MELÖN"
           />
           {errors.dj_name && (
@@ -110,7 +110,7 @@ const CreateEventForm = ({ onCancel, onSubmit }) => {
             {...register('event_name')}
             type="text"
             id="event_name"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             placeholder="e.g., SUNSHiiNE PRESENTS GMX"
           />
         </div>
@@ -124,7 +124,7 @@ const CreateEventForm = ({ onCancel, onSubmit }) => {
             {...register('event_date')}
             type="date"
             id="event_date"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
           />
         </div>
 
@@ -141,7 +141,7 @@ const CreateEventForm = ({ onCancel, onSubmit }) => {
             type="number"
             id="duration_days"
             min="1"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             placeholder="e.g., 3"
           />
           {errors.duration_days && (
@@ -158,7 +158,7 @@ const CreateEventForm = ({ onCancel, onSubmit }) => {
             {...register('venue_location')}
             type="text"
             id="venue_location"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             placeholder="e.g., GMX, Melbourne"
           />
         </div>
@@ -172,7 +172,7 @@ const CreateEventForm = ({ onCancel, onSubmit }) => {
             {...register('thumbnail_url')}
             type="url"
             id="thumbnail_url"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             placeholder="https://example.com/image.jpg"
           />
         </div>
@@ -186,7 +186,7 @@ const CreateEventForm = ({ onCancel, onSubmit }) => {
             {...register('description')}
             id="description"
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             placeholder="Add details about the event..."
           />
         </div>
@@ -197,7 +197,7 @@ const CreateEventForm = ({ onCancel, onSubmit }) => {
             type="button"
             onClick={handleCancel}
             disabled={submitting}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="px-4 py-2 bg-surface-700 border border-white/5 text-slate-300 rounded-xl hover:bg-surface-600 disabled:opacity-50 transition-colors cursor-pointer"
           >
             Cancel
           </button>

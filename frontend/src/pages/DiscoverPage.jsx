@@ -66,31 +66,31 @@ const DiscoverPage = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Discover</h1>
-        <p className="text-gray-600">
+        <h1 className="text-3xl font-bold mb-2 text-slate-100">Discover</h1>
+        <p className="text-slate-400">
           See what your friends and the community are reviewing, rating, and adding to their top 5.
         </p>
       </div>
 
       {/* Filter Tabs */}
       {isAuthenticated() && (
-        <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-1 flex">
+        <div className="mb-6 bg-surface-800 rounded-xl border border-white/5 p-1 flex">
           <button
             onClick={() => handleFilterChange(false)}
-            className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${
               !friendsOnly
                 ? 'bg-primary-600 text-white'
-                : 'text-gray-700 hover:bg-gray-100'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
             }`}
           >
             Public Feed
           </button>
           <button
             onClick={() => handleFilterChange(true)}
-            className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${
               friendsOnly
                 ? 'bg-primary-600 text-white'
-                : 'text-gray-700 hover:bg-gray-100'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
             }`}
           >
             Friends Only
@@ -99,9 +99,9 @@ const DiscoverPage = () => {
       )}
 
       {!isAuthenticated() && (
-        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-blue-800 text-sm">
-            <Link to="/login" className="font-medium hover:underline">Sign in</Link> to see activity from your friends.
+        <div className="mb-6 bg-primary-600/10 border border-primary-500/20 rounded-xl p-4">
+          <p className="text-primary-300 text-sm">
+            <Link to="/login" className="font-semibold hover:underline">Sign in</Link> to see activity from your friends.
           </p>
         </div>
       )}
@@ -111,21 +111,21 @@ const DiscoverPage = () => {
 
       {/* Pagination */}
       {pagination.pages > 1 && (
-        <div className="mt-6 flex items-center justify-center space-x-2">
+        <div className="mt-6 flex items-center justify-center gap-2">
           <button
             onClick={() => handlePageChange(pagination.page - 1)}
             disabled={pagination.page === 1}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="px-4 py-2 bg-surface-800 border border-white/5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
           >
             Previous
           </button>
-          <span className="px-4 py-2 text-sm text-gray-600">
-            Page {pagination.page} of {pagination.pages}
+          <span className="px-4 py-2 text-sm text-slate-500">
+            {pagination.page} / {pagination.pages}
           </span>
           <button
             onClick={() => handlePageChange(pagination.page + 1)}
             disabled={pagination.page >= pagination.pages}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="px-4 py-2 bg-surface-800 border border-white/5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
           >
             Next
           </button>

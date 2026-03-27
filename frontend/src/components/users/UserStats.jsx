@@ -13,7 +13,7 @@ const UserStats = ({ stats, loading, userId, isOwnProfile }) => {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="bg-gray-100 animate-pulse h-24 rounded-lg"></div>
+          <div key={i} className="bg-surface-700 animate-pulse h-24 rounded-xl"></div>
         ))}
       </div>
     );
@@ -87,7 +87,7 @@ const UserStats = ({ stats, loading, userId, isOwnProfile }) => {
           <div className="flex items-center space-x-3">
             <span className="text-2xl">{item.icon}</span>
             <div>
-              <div className="text-2xl font-bold text-gray-900">{item.value}</div>
+              <div className="text-2xl font-bold text-slate-100">{item.value}</div>
               <div className="text-sm text-gray-600">{item.label}</div>
             </div>
           </div>
@@ -99,7 +99,7 @@ const UserStats = ({ stats, loading, userId, isOwnProfile }) => {
             <Link
               key={index}
               to="/friends"
-              className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-primary-300 transition-all cursor-pointer"
+              className="bg-surface-800 p-4 rounded-xl border border-white/5 hover:border-primary-500/30 hover:bg-surface-700 transition-colors cursor-pointer"
             >
               {StatContent}
             </Link>
@@ -109,7 +109,7 @@ const UserStats = ({ stats, loading, userId, isOwnProfile }) => {
         return (
           <div
             key={index}
-            className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
+            className="bg-surface-800 p-4 rounded-xl border border-white/5"
           >
             {StatContent}
           </div>

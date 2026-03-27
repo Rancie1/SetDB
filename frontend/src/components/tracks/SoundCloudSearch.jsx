@@ -104,7 +104,7 @@ const SoundCloudSearch = () => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <div className="bg-surface-800 rounded-xl border border-white/5 p-6 mb-6">
       <h2 className="text-xl font-semibold mb-4">Search Tracks</h2>
       <p className="text-sm text-gray-600 mb-4">
         Search SoundCloud and Spotify. Click on a track to view or add it to Deckd.
@@ -117,12 +117,12 @@ const SoundCloudSearch = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search for tracks, artists, or songs..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="flex-1 px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
           />
           <select
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="px-4 py-2 bg-surface-700 border border-white/10 text-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm cursor-pointer"
           >
             <option value="all">All Platforms</option>
             <option value="soundcloud">SoundCloud</option>
@@ -151,7 +151,7 @@ const SoundCloudSearch = () => {
               {searchResults.map((track) => (
                 <div
                   key={track.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  className="bg-surface-700 border border-white/5 rounded-xl p-4 hover:bg-surface-600 transition-colors cursor-pointer"
                 >
                   <div className="flex items-start gap-4">
                     {/* Thumbnail */}
@@ -166,7 +166,7 @@ const SoundCloudSearch = () => {
                     {/* Track Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <h3 className="font-semibold text-gray-900 truncate">{track.title}</h3>
+                        <h3 className="font-semibold text-slate-200 truncate">{track.title}</h3>
                         {track.platform === 'spotify' && (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 flex-shrink-0">Spotify</span>
                         )}

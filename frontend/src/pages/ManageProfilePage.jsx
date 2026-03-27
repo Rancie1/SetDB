@@ -74,7 +74,7 @@ const ManageProfilePage = () => {
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-surface-800 rounded-xl border border-white/5 p-6">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
             <div className="space-y-4">
@@ -97,7 +97,7 @@ const ManageProfilePage = () => {
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-surface-800 rounded-xl border border-white/5 p-6">
         {success && (
           <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
             Profile updated successfully! Redirecting...
@@ -125,7 +125,7 @@ const ManageProfilePage = () => {
               })}
               type="text"
               id="display_name"
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
               placeholder="Your display name"
             />
             {errors.display_name && (
@@ -142,7 +142,7 @@ const ManageProfilePage = () => {
               {...register('bio')}
               id="bio"
               rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
               placeholder="Tell us about yourself..."
             />
             <p className="mt-1 text-sm text-gray-500">
@@ -168,7 +168,7 @@ const ManageProfilePage = () => {
               })}
               type="url"
               id="avatar_url"
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
               placeholder="https://example.com/avatar.jpg"
             />
             {errors.avatar_url && (
@@ -189,7 +189,7 @@ const ManageProfilePage = () => {
               id="username"
               value={currentUser?.username || ''}
               disabled
-              className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
+              className="w-full px-4 py-2 bg-surface-700 border border-white/5 text-slate-500 rounded-xl cursor-not-allowed"
             />
             <p className="mt-1 text-sm text-gray-500">
               Username cannot be changed.
@@ -206,7 +206,7 @@ const ManageProfilePage = () => {
               id="email"
               value={currentUser?.email || ''}
               disabled
-              className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
+              className="w-full px-4 py-2 bg-surface-700 border border-white/5 text-slate-500 rounded-xl cursor-not-allowed"
             />
             <p className="mt-1 text-sm text-gray-500">
               Email cannot be changed here.
@@ -214,11 +214,11 @@ const ManageProfilePage = () => {
           </div>
 
           {/* Form Actions */}
-          <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-end space-x-4 pt-4 border-t border-white/5">
             <button
               type="button"
               onClick={handleCancel}
-              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium"
+              className="px-6 py-2 bg-surface-700 border border-white/5 text-slate-300 rounded-xl hover:bg-surface-600 font-medium transition-colors cursor-pointer"
               disabled={saving}
             >
               Cancel

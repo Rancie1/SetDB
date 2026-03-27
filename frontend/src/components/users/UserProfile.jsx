@@ -203,8 +203,8 @@ const UserProfile = () => {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="animate-pulse">
-          <div className="h-32 bg-gray-200 rounded-lg mb-6"></div>
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-32 bg-surface-700 rounded-xl mb-6"></div>
+          <div className="h-8 bg-surface-700 rounded w-1/4 mb-4"></div>
         </div>
       </div>
     );
@@ -214,8 +214,8 @@ const UserProfile = () => {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">User Not Found</h2>
-          <p className="text-gray-600">The user you're looking for doesn't exist.</p>
+          <h2 className="text-2xl font-bold text-slate-100 mb-2">User Not Found</h2>
+          <p className="text-slate-400">The user you're looking for doesn't exist.</p>
         </div>
       </div>
     );
@@ -224,24 +224,24 @@ const UserProfile = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Profile Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+      <div className="bg-surface-800 rounded-xl border border-white/5 p-6 mb-6">
         <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-4">
             {/* Avatar */}
-            <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center text-2xl font-bold text-primary-600">
+            <div className="w-20 h-20 bg-primary-600/20 rounded-full flex items-center justify-center text-2xl font-bold text-primary-400">
               {user.username?.[0]?.toUpperCase() || 'U'}
             </div>
-            
+
             {/* User Info */}
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-slate-100">
                 {user.display_name || user.username}
               </h1>
-              <p className="text-gray-600">@{user.username}</p>
+              <p className="text-slate-400 text-sm">@{user.username}</p>
               {user.bio && (
-                <p className="text-gray-700 mt-2">{user.bio}</p>
+                <p className="text-slate-300 mt-2 text-sm">{user.bio}</p>
               )}
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-xs text-slate-500 mt-2">
                 Joined {new Date(user.created_at).toLocaleDateString()}
               </p>
             </div>
@@ -252,30 +252,26 @@ const UserProfile = () => {
             <button
               onClick={handleFollow}
               disabled={followingLoading}
-              className={`px-6 py-2 rounded-md font-medium ${
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 ${
                 isFollowing
-                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                  : 'bg-primary-600 hover:bg-primary-700 text-white'
-              } disabled:opacity-50`}
+                  ? 'bg-white/5 hover:bg-white/10 text-slate-300'
+                  : 'bg-primary-600 hover:bg-primary-500 text-white'
+              }`}
             >
-              {followingLoading
-                ? '...'
-                : isFollowing
-                ? 'Friends'
-                : 'Add Friend'}
+              {followingLoading ? '...' : isFollowing ? 'Friends' : 'Add Friend'}
             </button>
           )}
           {isOwnProfile && (
-            <div className="flex space-x-3">
+            <div className="flex gap-2">
               <Link
                 to="/friends"
-                className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md font-medium"
+                className="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 Friends
               </Link>
               <Link
                 to="/profile/manage"
-                className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium"
+                className="px-5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-sm font-medium transition-colors"
               >
                 Manage Profile
               </Link>
@@ -313,9 +309,9 @@ const UserProfile = () => {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6" aria-label="Tabs">
+      <div className="bg-surface-800 rounded-xl border border-white/5">
+        <div className="border-b border-white/5">
+          <nav className="flex gap-1 px-4 pt-2" aria-label="Tabs">
             {[
               { id: 'listened', label: 'Listened Sets' },
               { id: 'live-sets', label: 'Live Sets Seen' },
@@ -326,10 +322,10 @@ const UserProfile = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
                   activeTab === tab.id
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary-400 text-primary-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-white/20'
                 }`}
               >
                 {tab.label}
@@ -342,32 +338,30 @@ const UserProfile = () => {
         <div className="p-6">
           {activeTab === 'stats' && (
             <div>
-              <h3 className="text-lg font-semibold mb-4">Statistics</h3>
+              <h3 className="text-lg font-semibold mb-4 text-slate-100">Statistics</h3>
               <UserStats stats={stats} loading={loading} userId={id} isOwnProfile={isOwnProfile} />
             </div>
           )}
           {activeTab === 'listened' && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Listened Sets</h3>
+                <h3 className="text-lg font-semibold text-slate-100">Listened Sets</h3>
                 {listenedSetsTotal > 0 && (
-                  <p className="text-sm text-gray-600">
-                    Showing {listenedSets.length} of {listenedSetsTotal} listened sets
+                  <p className="text-sm text-slate-400">
+                    {listenedSets.length} of {listenedSetsTotal}
                   </p>
                 )}
               </div>
               {listenedSetsLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-64"></div>
+                    <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-64"></div>
                   ))}
                 </div>
               ) : listenedSets.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg mb-2">No listened sets yet</p>
-                  <p className="text-gray-400 text-sm">
-                    Sets you mark as listened (YouTube/SoundCloud) will appear here
-                  </p>
+                  <p className="text-slate-400 text-lg mb-2">No listened sets yet</p>
+                  <p className="text-slate-500 text-sm">Sets you mark as listened will appear here</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -381,25 +375,21 @@ const UserProfile = () => {
           {activeTab === 'live-sets' && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Live Sets Seen</h3>
+                <h3 className="text-lg font-semibold text-slate-100">Live Sets Seen</h3>
                 {liveSetsTotal > 0 && (
-                  <p className="text-sm text-gray-600">
-                    {liveSetsSeen.length} of {liveSetsTotal} live sets
-                  </p>
+                  <p className="text-sm text-slate-400">{liveSetsSeen.length} of {liveSetsTotal}</p>
                 )}
               </div>
               {liveSetsLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-64"></div>
+                    <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-64"></div>
                   ))}
                 </div>
               ) : liveSetsSeen.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg mb-2">No live sets seen yet</p>
-                  <p className="text-gray-400 text-sm">
-                    Live sets you mark as seen will appear here
-                  </p>
+                  <p className="text-slate-400 text-lg mb-2">No live sets seen yet</p>
+                  <p className="text-slate-500 text-sm">Live sets you mark as seen will appear here</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -413,25 +403,21 @@ const UserProfile = () => {
           {activeTab === 'events' && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Events Attended</h3>
+                <h3 className="text-lg font-semibold text-slate-100">Events Attended</h3>
                 {eventsTotal > 0 && (
-                  <p className="text-sm text-gray-600">
-                    {eventsAttended.length} of {eventsTotal} events
-                  </p>
+                  <p className="text-sm text-slate-400">{eventsAttended.length} of {eventsTotal}</p>
                 )}
               </div>
               {eventsLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-64"></div>
+                    <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-64"></div>
                   ))}
                 </div>
               ) : eventsAttended.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg mb-2">No events attended yet</p>
-                  <p className="text-gray-400 text-sm">
-                    Events you confirm will appear here
-                  </p>
+                  <p className="text-slate-400 text-lg mb-2">No events attended yet</p>
+                  <p className="text-slate-500 text-sm">Events you confirm will appear here</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -439,40 +425,36 @@ const UserProfile = () => {
                     <Link
                       key={event.id}
                       to={`/events/${event.id}`}
-                      className="block bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden"
+                      className="block bg-surface-800 rounded-xl border border-white/5 hover:border-primary-500/30 hover:bg-surface-700 transition-colors overflow-hidden cursor-pointer"
                     >
-                      <div className="aspect-video bg-gray-200 relative overflow-hidden">
+                      <div className="aspect-video bg-surface-700 relative overflow-hidden">
                         {event.thumbnail_url ? (
-                          <img
-                            src={event.thumbnail_url}
-                            alt={event.title}
-                            className="w-full h-full object-cover"
-                          />
+                          <img src={event.thumbnail_url} alt={event.title} className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-400">
-                            <span className="text-4xl">🎤</span>
+                          <div className="w-full h-full flex items-center justify-center">
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-slate-600">
+                              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                            </svg>
                           </div>
                         )}
                         <div className="absolute top-2 right-2">
-                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border bg-green-100 text-green-800 border-green-300">
-                            ✓ Attended
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-accent-500/20 text-accent-400 border border-accent-500/30">
+                            Attended
                           </span>
                         </div>
                       </div>
                       <div className="p-4">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1 line-clamp-2">
+                        <h3 className="text-sm font-semibold text-slate-100 mb-1 line-clamp-2">
                           {event.event_name || event.title}
                         </h3>
-                        <p className="text-sm text-gray-600 mb-2">{event.dj_name}</p>
+                        <p className="text-xs text-slate-400 mb-2">{event.dj_name}</p>
                         {event.event_date && (
-                          <p className="text-sm text-gray-700">
-                            📅 {new Date(event.event_date).toLocaleDateString()}
+                          <p className="text-xs text-slate-500">
+                            {new Date(event.event_date).toLocaleDateString()}
                           </p>
                         )}
                         {event.venue_location && (
-                          <p className="text-sm text-gray-700 mt-1">
-                            📍 {event.venue_location}
-                          </p>
+                          <p className="text-xs text-slate-500 mt-0.5 truncate">{event.venue_location}</p>
                         )}
                       </div>
                     </Link>
@@ -483,7 +465,7 @@ const UserProfile = () => {
           )}
           {activeTab === 'reviews' && (
             <div>
-              <p className="text-gray-600">Reviews will appear here...</p>
+              <p className="text-slate-400">Reviews will appear here...</p>
             </div>
           )}
         </div>

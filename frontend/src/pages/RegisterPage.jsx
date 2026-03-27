@@ -6,7 +6,7 @@ import RegisterForm from '../components/auth/RegisterForm';
 
 const RegisterPage = () => {
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-surface-900 py-12">
       <RegisterForm />
     </div>
   );

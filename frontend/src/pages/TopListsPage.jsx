@@ -232,7 +232,7 @@ const TopListsPage = () => {
 
         {/* Add Item Form */}
         {showAddItemForm && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="bg-surface-800 rounded-xl border border-white/5 p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">Add Item to List</h2>
             {selectedList.list_type === 'venues' ? (
               <div className="space-y-4">
@@ -244,7 +244,7 @@ const TopListsPage = () => {
                     type="text"
                     value={venueName}
                     onChange={(e) => setVenueName(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                     placeholder="Enter venue name"
                   />
                 </div>
@@ -268,7 +268,7 @@ const TopListsPage = () => {
                       setSearchQuery(e.target.value);
                       handleSearch(e.target.value);
                     }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                     placeholder={`Search ${selectedList.list_type}...`}
                   />
                 </div>
@@ -276,13 +276,13 @@ const TopListsPage = () => {
                   <p className="text-sm text-gray-500">Searching...</p>
                 )}
                 {searchResults.length > 0 && (
-                  <div className="border border-gray-200 rounded-md max-h-64 overflow-y-auto">
+                  <div className="bg-surface-700 border border-white/10 rounded-xl max-h-64 overflow-y-auto">
                     {searchResults.map((item) => (
                       <div
                         key={item.id}
                         onClick={() => setSelectedItem(item)}
-                        className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 ${
-                          selectedItem?.id === item.id ? 'bg-primary-50 border-primary-200' : ''
+                        className={`p-4 border-b border-white/5 cursor-pointer hover:bg-surface-600 transition-colors ${
+                          selectedItem?.id === item.id ? 'bg-primary-600/20' : ''
                         }`}
                       >
                         {selectedList.list_type === 'sets' && (
@@ -331,7 +331,7 @@ const TopListsPage = () => {
               .map((item, index) => (
                 <div
                   key={item.id}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+                  className="bg-surface-800 rounded-xl border border-white/5 p-6"
                 >
                   <div className="flex items-start space-x-4">
                     <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">
@@ -344,7 +344,7 @@ const TopListsPage = () => {
                       {selectedList.list_type === 'events' && item.event && (
                         <Link
                           to={`/events/${item.event.id}`}
-                          className="block bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
+                          className="block bg-surface-700 rounded-xl p-4 hover:bg-surface-600 transition-colors"
                         >
                           <h3 className="font-semibold text-lg">{item.event.title}</h3>
                           <p className="text-gray-600">{item.event.dj_name}</p>
@@ -359,14 +359,14 @@ const TopListsPage = () => {
                       {selectedList.list_type === 'tracks' && item.track && (
                         <Link
                           to={`/tracks/${item.track.id}`}
-                          className="block bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
+                          className="block bg-surface-700 rounded-xl p-4 hover:bg-surface-600 transition-colors"
                         >
                           <h3 className="font-semibold text-lg">{item.track.track_name}</h3>
                           <p className="text-gray-600">{item.track.artist_name || 'Unknown Artist'}</p>
                         </Link>
                       )}
                       {selectedList.list_type === 'venues' && item.venue_name && (
-                        <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="bg-surface-700 rounded-xl p-4">
                           <h3 className="font-semibold text-lg">{item.venue_name}</h3>
                         </div>
                       )}
@@ -386,7 +386,7 @@ const TopListsPage = () => {
                 </div>
               ))
           ) : (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+            <div className="bg-surface-800 rounded-xl border border-white/5 p-8 text-center">
               <p className="text-gray-500">No items in this list yet.</p>
             </div>
           )}
@@ -415,7 +415,7 @@ const TopListsPage = () => {
 
         {/* Create List Form */}
         {showCreateForm && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="bg-surface-800 rounded-xl border border-white/5 p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">Create New List</h2>
             <form onSubmit={handleCreateList} className="space-y-4">
               <div>
@@ -426,7 +426,7 @@ const TopListsPage = () => {
                   type="text"
                   value={newListData.name}
                   onChange={(e) => setNewListData({ ...newListData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   placeholder="e.g., Top 5 Techno Sets 2024"
                   required
                 />
@@ -438,7 +438,7 @@ const TopListsPage = () => {
                 <textarea
                   value={newListData.description}
                   onChange={(e) => setNewListData({ ...newListData, description: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   rows="3"
                   placeholder="Describe your list..."
                 />
@@ -450,7 +450,7 @@ const TopListsPage = () => {
                 <select
                   value={newListData.list_type}
                   onChange={(e) => setNewListData({ ...newListData, list_type: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                 >
                   <option value="sets">Sets</option>
                   <option value="events">Events</option>
@@ -466,7 +466,7 @@ const TopListsPage = () => {
                   type="number"
                   value={newListData.max_items}
                   onChange={(e) => setNewListData({ ...newListData, max_items: parseInt(e.target.value) || 5 })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-4 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   min="1"
                   max="100"
                 />
@@ -493,7 +493,7 @@ const TopListsPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowCreateForm(false)}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-md font-medium"
+                  className="bg-surface-700 hover:bg-surface-600 text-slate-300 px-6 py-2 rounded-xl font-medium border border-white/5 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -507,7 +507,7 @@ const TopListsPage = () => {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-48"></div>
+            <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-48"></div>
           ))}
         </div>
       ) : error ? (
@@ -515,7 +515,7 @@ const TopListsPage = () => {
           <p className="text-red-800">{error}</p>
         </div>
       ) : lists.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-surface-800 rounded-xl border border-white/5 p-12 text-center">
           <p className="text-gray-500 text-lg mb-2">No lists yet</p>
           <p className="text-gray-400 text-sm mb-4">
             Create your first top 5 list to get started!
@@ -532,11 +532,11 @@ const TopListsPage = () => {
           {lists.map((list) => (
             <div
               key={list.id}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-surface-800 rounded-xl border border-white/5 p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-1">{list.name}</h3>
+                  <h3 className="text-xl font-semibold text-slate-100 mb-1">{list.name}</h3>
                   <p className="text-sm text-gray-500 capitalize">{list.list_type}</p>
                 </div>
                 <div className="flex space-x-2">

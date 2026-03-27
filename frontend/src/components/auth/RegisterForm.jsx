@@ -22,30 +22,28 @@ const RegisterForm = () => {
     clearError();
     const result = await registerUser(data);
     if (result.success) {
-      // After registration, try to login automatically
       const loginResult = await login(data.email, data.password);
       if (loginResult.success) {
         navigate('/');
       } else {
-        // If auto-login fails, redirect to login page
         navigate('/login');
       }
     }
   };
 
   return (
-    <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold text-center mb-6">Join {APP_NAME}</h2>
-      
+    <div className="max-w-md mx-auto mt-8 p-6 bg-surface-800 rounded-xl border border-white/5">
+      <h2 className="text-2xl font-bold text-center mb-6 text-slate-100">Join {APP_NAME}</h2>
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm">
             {error}
           </div>
         )}
 
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="username" className="block text-sm font-medium text-slate-400 mb-1">
             Username
           </label>
           <input
@@ -55,15 +53,15 @@ const RegisterForm = () => {
               required: 'Username is required',
               minLength: { value: 3, message: 'Username must be at least 3 characters' },
             })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-3 py-2.5 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
           />
           {errors.username && (
-            <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
+            <p className="mt-1 text-sm text-red-400">{errors.username.message}</p>
           )}
         </div>
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="email" className="block text-sm font-medium text-slate-400 mb-1">
             Email
           </label>
           <input
@@ -76,15 +74,15 @@ const RegisterForm = () => {
                 message: 'Invalid email address',
               },
             })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-3 py-2.5 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
           />
           {errors.email && (
-            <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+            <p className="mt-1 text-sm text-red-400">{errors.email.message}</p>
           )}
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="password" className="block text-sm font-medium text-slate-400 mb-1">
             Password
           </label>
           <div className="relative">
@@ -95,23 +93,23 @@ const RegisterForm = () => {
                 required: 'Password is required',
                 minLength: { value: 8, message: 'Password must be at least 8 characters' },
               })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2.5 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-2 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 text-sm cursor-pointer"
             >
               {showPassword ? 'Hide' : 'Show'}
             </button>
           </div>
           {errors.password && (
-            <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+            <p className="mt-1 text-sm text-red-400">{errors.password.message}</p>
           )}
         </div>
 
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-400 mb-1">
             Confirm Password
           </label>
           <input
@@ -119,28 +117,27 @@ const RegisterForm = () => {
             id="confirmPassword"
             {...register('confirmPassword', {
               required: 'Please confirm your password',
-              validate: (value) =>
-                value === password || 'Passwords do not match',
+              validate: (value) => value === password || 'Passwords do not match',
             })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-3 py-2.5 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
           />
           {errors.confirmPassword && (
-            <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>
+            <p className="mt-1 text-sm text-red-400">{errors.confirmPassword.message}</p>
           )}
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-primary-600 hover:bg-primary-500 text-white font-medium py-2.5 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           {loading ? 'Creating account...' : 'Sign Up'}
         </button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-gray-600">
+      <p className="mt-4 text-center text-sm text-slate-500">
         Already have an account?{' '}
-        <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">
+        <Link to="/login" className="text-primary-400 hover:text-primary-300 font-medium">
           Login
         </Link>
       </p>
@@ -149,4 +146,3 @@ const RegisterForm = () => {
 };
 
 export default RegisterForm;
-

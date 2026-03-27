@@ -65,7 +65,7 @@ const SetImportForm = ({ onSuccess }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <div className="bg-surface-800 rounded-xl border border-white/5 p-6 mb-6">
       <h2 className="text-xl font-semibold mb-4">Import a DJ Set</h2>
       <p className="text-gray-600 mb-4">
         Paste a YouTube or SoundCloud URL to import a set

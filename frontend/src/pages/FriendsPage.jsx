@@ -98,7 +98,7 @@ const FriendsPage = () => {
         {loading ? (
           <div className="space-y-4">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-20"></div>
+              <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-20"></div>
             ))}
           </div>
         ) : error ? (
@@ -106,7 +106,7 @@ const FriendsPage = () => {
             {error}
           </div>
         ) : friends.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="text-center py-12 bg-surface-800 rounded-xl border border-white/5">
             <p className="text-gray-500 text-lg mb-2">No friends yet</p>
             <p className="text-gray-400 text-sm mb-4">
               Start following people to see them here.
@@ -124,7 +124,7 @@ const FriendsPage = () => {
               <Link
                 key={friend.id}
                 to={`/users/${friend.id}`}
-                className="block bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow p-4"
+                className="block bg-surface-800 rounded-xl border border-white/5 hover:border-primary-500/30 hover:bg-surface-700 transition-colors p-4"
               >
                 <div className="flex items-center space-x-4">
                   {/* Avatar */}
@@ -134,7 +134,7 @@ const FriendsPage = () => {
                   
                   {/* Friend Info */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">
+                    <h3 className="text-lg font-semibold text-slate-100 truncate">
                       {friend.display_name || friend.username}
                     </h3>
                     <p className="text-sm text-gray-600">@{friend.username}</p>
@@ -164,7 +164,7 @@ const FriendsPage = () => {
           <button
             onClick={() => loadFriends(pagination.page - 1)}
             disabled={pagination.page === 1}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="px-4 py-2 bg-surface-800 border border-white/5 rounded-lg text-slate-300 hover:text-white hover:bg-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             Previous
           </button>
@@ -174,7 +174,7 @@ const FriendsPage = () => {
           <button
             onClick={() => loadFriends(pagination.page + 1)}
             disabled={pagination.page >= pagination.pages}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="px-4 py-2 bg-surface-800 border border-white/5 rounded-lg text-slate-300 hover:text-white hover:bg-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             Next
           </button>

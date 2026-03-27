@@ -1,6 +1,6 @@
 /**
  * Sets page.
- * 
+ *
  * Single unified search across DB and SoundCloud.
  * When not searching, shows all sets in Deckd.
  * Clicking a SoundCloud result auto-imports it and navigates to the detail page.
@@ -11,6 +11,24 @@ import { Link, useNavigate } from 'react-router-dom';
 import * as setsService from '../services/setsService';
 import useAuthStore from '../store/authStore';
 
+const sourceBadge = (sourceType) => {
+  switch (sourceType?.toLowerCase()) {
+    case 'youtube': return 'bg-red-500/20 text-red-300 border border-red-500/30';
+    case 'soundcloud': return 'bg-orange-500/20 text-orange-300 border border-orange-500/30';
+    case 'live': return 'bg-violet-500/20 text-violet-300 border border-violet-500/30';
+    default: return 'bg-white/5 text-slate-400 border border-white/10';
+  }
+};
+
+const sourceLabel = (sourceType) => {
+  switch (sourceType?.toLowerCase()) {
+    case 'youtube': return 'YouTube';
+    case 'soundcloud': return 'SoundCloud';
+    case 'live': return 'Live';
+    default: return sourceType || 'Unknown';
+  }
+};
+
 const SetsPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
@@ -18,73 +36,41 @@ const SetsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
-  // DB browse state
   const [dbSets, setDbSets] = useState([]);
   const [dbLoading, setDbLoading] = useState(false);
   const [dbError, setDbError] = useState(null);
   const [sortBy, setSortBy] = useState('created_at');
-  const [pagination, setPagination] = useState({
-    page: 1, limit: 20, total: 0, pages: 0,
-  });
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 });
 
-  // Unified search results
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
-
-  // Set being imported
   const [importingId, setImportingId] = useState(null);
 
   const searchTimeout = useRef(null);
 
   useEffect(() => {
-    if (!isSearching) {
-      loadDbSets();
-    }
+    if (!isSearching) loadDbSets();
   }, [pagination.page, sortBy, isSearching]);
 
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
-
-    if (!searchQuery.trim()) {
-      setIsSearching(false);
-      setSearchResults([]);
-      return;
-    }
-
+    if (!searchQuery.trim()) { setIsSearching(false); setSearchResults([]); return; }
     setIsSearching(true);
     setSearchLoading(true);
-
-    searchTimeout.current = setTimeout(() => {
-      performSearch(searchQuery.trim());
-    }, 400);
-
-    return () => {
-      if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    };
+    searchTimeout.current = setTimeout(() => performSearch(searchQuery.trim()), 400);
+    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
   }, [searchQuery]);
 
   const loadDbSets = async () => {
-    setDbLoading(true);
-    setDbError(null);
+    setDbLoading(true); setDbError(null);
     try {
-      const response = await setsService.getSets(
-        { sort: sortBy },
-        pagination.page,
-        pagination.limit
-      );
+      const response = await setsService.getSets({ sort: sortBy }, pagination.page, pagination.limit);
       setDbSets(response.data.items || []);
-      setPagination(prev => ({
-        ...prev,
-        total: response.data.total || 0,
-        pages: response.data.pages || 0,
-      }));
+      setPagination(prev => ({ ...prev, total: response.data.total || 0, pages: response.data.pages || 0 }));
     } catch (err) {
-      console.error('Failed to load sets:', err);
       setDbError(err.response?.data?.detail || 'Failed to load sets');
       setDbSets([]);
-    } finally {
-      setDbLoading(false);
-    }
+    } finally { setDbLoading(false); }
   };
 
   const performSearch = async (query) => {
@@ -94,57 +80,25 @@ const SetsPage = () => {
         setsService.getSets({ search: query }, 1, 10),
         setsService.searchSoundCloudSets(query, 15).catch(() => ({ data: [] })),
       ]);
-
-      const dbItems = (dbResponse.data.items || []).map(s => ({
-        ...s,
-        _source: 'db',
-        _dbId: s.id,
-      }));
-
-      const scItems = (scResponse.data || []).map(s => ({
-        ...s,
-        _source: 'soundcloud',
-        _dbId: null,
-        _scId: s.id,
-      }));
-
-      // Deduplicate: skip SoundCloud results that match a DB set by URL
+      const dbItems = (dbResponse.data.items || []).map(s => ({ ...s, _source: 'db', _dbId: s.id }));
+      const scItems = (scResponse.data || []).map(s => ({ ...s, _source: 'soundcloud', _dbId: null, _scId: s.id }));
       const dbUrls = new Set(dbItems.map(s => s.source_url).filter(Boolean));
-      const deduped = scItems.filter(s => !dbUrls.has(s.soundcloud_url));
-
-      setSearchResults([...dbItems, ...deduped]);
-    } catch (err) {
-      console.error('Search failed:', err);
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
-    }
+      setSearchResults([...dbItems, ...scItems.filter(s => !dbUrls.has(s.soundcloud_url))]);
+    } catch (err) { setSearchResults([]); }
+    finally { setSearchLoading(false); }
   };
 
   const handleSetClick = async (set) => {
-    if (set._dbId) {
-      navigate(`/sets/${set._dbId}`);
-      return;
-    }
-
-    // Auto-import from SoundCloud
-    if (!isAuthenticated()) {
-      navigate('/login');
-      return;
-    }
-
+    if (set._dbId) { navigate(`/sets/${set._dbId}`); return; }
+    if (!isAuthenticated()) { navigate('/login'); return; }
     if (!set.soundcloud_url) return;
-
     setImportingId(set._scId);
     try {
       const response = await setsService.importSetFromSoundCloud(set.soundcloud_url);
       navigate(`/sets/${response.data.id}`);
     } catch (err) {
-      console.error('Failed to import set:', err);
       alert(err.response?.data?.detail || 'Failed to import set');
-    } finally {
-      setImportingId(null);
-    }
+    } finally { setImportingId(null); }
   };
 
   const handleSortChange = (newSort) => {
@@ -152,147 +106,112 @@ const SetsPage = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  const handleClear = () => {
-    setSearchQuery('');
-    setIsSearching(false);
-    setSearchResults([]);
-  };
+  const handleClear = () => { setSearchQuery(''); setIsSearching(false); setSearchResults([]); };
 
   const formatDuration = (ms) => {
     if (!ms) return '';
     const totalMinutes = Math.floor(ms / 60000);
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
-    if (hours > 0) return `${hours}h ${mins}m`;
-    return `${mins}m`;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
   const formatDurationMinutes = (minutes) => {
     if (!minutes) return '';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    if (hours > 0) return `${hours}h ${mins}m`;
-    return `${mins}m`;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  // Unified set card renderer
+  const MusicIcon = () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-slate-600">
+      <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
+    </svg>
+  );
+
   const renderSetCard = (set, index) => {
     const isDb = set._source === 'db';
     const isImporting = importingId === set._scId;
+    const cardClass = "block bg-surface-800 rounded-xl border border-white/5 overflow-hidden hover:border-primary-500/30 hover:bg-surface-700 transition-colors cursor-pointer";
 
-    if (isDb) {
-      return (
-        <Link
-          key={`db-${set._dbId}-${index}`}
-          to={`/sets/${set._dbId}`}
-          className="block bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md hover:border-primary-200 transition-all"
-        >
-          <div className="flex">
-            {/* Thumbnail */}
-            <div className="w-40 h-28 flex-shrink-0 bg-gray-200 relative overflow-hidden">
-              {set.thumbnail_url ? (
-                <img
-                  src={set.thumbnail_url}
-                  alt={set.title}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl">
-                  🎧
-                </div>
-              )}
-              {set.source_type && (
-                <span className={`absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                  set.source_type === 'youtube' ? 'bg-red-100 text-red-700' :
-                  set.source_type === 'soundcloud' ? 'bg-orange-100 text-orange-700' :
-                  set.source_type === 'live' ? 'bg-purple-100 text-purple-700' :
-                  'bg-gray-100 text-gray-600'
-                }`}>
-                  {set.source_type === 'youtube' ? 'YouTube' :
-                   set.source_type === 'soundcloud' ? 'SoundCloud' :
-                   set.source_type === 'live' ? 'Live' : set.source_type}
-                </span>
-              )}
-            </div>
-            {/* Info */}
-            <div className="flex-1 p-3 min-w-0">
-              <h3 className="font-semibold text-gray-900 truncate mb-0.5">{set.title}</h3>
-              <p className="text-sm text-gray-600 truncate">{set.dj_name}</p>
-              <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
-                {set.duration_minutes > 0 && (
-                  <span>{formatDurationMinutes(set.duration_minutes)}</span>
-                )}
-                {set.source_type === 'live' && set.recording_url && (
-                  <span className="text-purple-500">Has Recording</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </Link>
-      );
-    }
-
-    // SoundCloud result (not yet imported)
-    return (
-      <button
-        key={`sc-${set._scId}-${index}`}
-        onClick={() => handleSetClick(set)}
-        disabled={isImporting}
-        className="w-full text-left bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md hover:border-primary-200 transition-all disabled:opacity-60"
-      >
-        <div className="flex">
-          {/* Thumbnail */}
-          <div className="w-40 h-28 flex-shrink-0 bg-gray-200 relative overflow-hidden">
-            {set.thumbnail_url ? (
-              <img
-                src={set.thumbnail_url}
-                alt={set.title}
-                className="w-full h-full object-cover"
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl">
-                🎧
-              </div>
-            )}
-            <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700">
+    const cardInner = (
+      <div className="flex">
+        <div className="w-36 h-24 flex-shrink-0 bg-surface-700 relative overflow-hidden">
+          {set.thumbnail_url ? (
+            <img src={set.thumbnail_url} alt={set.title} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center"><MusicIcon /></div>
+          )}
+          {set.source_type && (
+            <span className={`absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${sourceBadge(set.source_type)}`}>
+              {sourceLabel(set.source_type)}
+            </span>
+          )}
+          {!isDb && (
+            <span className={`absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${sourceBadge('soundcloud')}`}>
               SoundCloud
             </span>
+          )}
+        </div>
+        <div className="flex-1 p-3 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <h3 className="font-semibold text-slate-100 truncate text-sm">{set.title}</h3>
+            {isImporting && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-400 flex-shrink-0"></div>}
           </div>
-          {/* Info */}
-          <div className="flex-1 p-3 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="font-semibold text-gray-900 truncate">{set.title}</h3>
-              {isImporting && (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-500 flex-shrink-0"></div>
-              )}
-            </div>
-            <p className="text-sm text-gray-600 truncate">{set.dj_name}</p>
-            <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
-              {set.duration_ms > 0 && (
-                <span>{formatDuration(set.duration_ms)}</span>
-              )}
-              {set.playback_count > 0 && (
-                <span>{set.playback_count.toLocaleString()} plays</span>
-              )}
-              {set.likes_count > 0 && (
-                <span>{set.likes_count.toLocaleString()} likes</span>
-              )}
-            </div>
+          <p className="text-xs text-slate-400 truncate">{set.dj_name}</p>
+          <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
+            {isDb && set.duration_minutes > 0 && <span>{formatDurationMinutes(set.duration_minutes)}</span>}
+            {!isDb && set.duration_ms > 0 && <span>{formatDuration(set.duration_ms)}</span>}
+            {!isDb && set.playback_count > 0 && <span>{set.playback_count.toLocaleString()} plays</span>}
+            {set.source_type === 'live' && set.recording_url && <span className="text-violet-400">Has Recording</span>}
           </div>
         </div>
+      </div>
+    );
+
+    if (isDb) {
+      return <Link key={`db-${set._dbId}-${index}`} to={`/sets/${set._dbId}`} className={cardClass}>{cardInner}</Link>;
+    }
+    return (
+      <button key={`sc-${set._scId}-${index}`} onClick={() => handleSetClick(set)} disabled={isImporting}
+        className={`w-full text-left ${cardClass} disabled:opacity-60`}>
+        {cardInner}
       </button>
     );
   };
 
+  const Skeleton = () => (
+    <div className="space-y-3">
+      {[1,2,3,4,5].map(i => <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-24"></div>)}
+    </div>
+  );
+
+  const EmptyState = ({ title, subtitle }) => (
+    <div className="bg-surface-800 border border-white/5 rounded-xl p-8 text-center">
+      <p className="text-slate-400 mb-1">{title}</p>
+      <p className="text-slate-500 text-sm">{subtitle}</p>
+    </div>
+  );
+
+  const Pagination = ({ page, pages, onChange }) => pages > 1 && (
+    <div className="flex items-center justify-center gap-2 mt-6">
+      <button onClick={() => onChange(page - 1)} disabled={page === 1}
+        className="px-4 py-2 bg-surface-800 border border-white/5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer">
+        Previous
+      </button>
+      <span className="px-4 py-2 text-sm text-slate-500">{page} / {pages}</span>
+      <button onClick={() => onChange(page + 1)} disabled={page >= pages}
+        className="px-4 py-2 bg-surface-800 border border-white/5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer">
+        Next
+      </button>
+    </div>
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Sets</h1>
-        <p className="text-gray-600">
-          Search across Deckd and SoundCloud for DJ sets and mixes — or browse what's already here.
-        </p>
+        <h1 className="text-3xl font-bold mb-2 text-slate-100">Sets</h1>
+        <p className="text-slate-400">Search across Deckd and SoundCloud — or browse what's already here.</p>
       </div>
 
       {/* Search Bar */}
@@ -303,18 +222,15 @@ const SetsPage = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search for any DJ set, mix, or artist..."
-            className="w-full px-4 py-3 pl-11 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-lg"
+            className="w-full px-4 py-3 pl-11 bg-surface-800 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
           />
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
           {searchQuery && (
-            <button
-              onClick={handleClear}
-              className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={handleClear} className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-300 cursor-pointer">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -322,114 +238,54 @@ const SetsPage = () => {
           )}
         </div>
         {isSearching && !searchLoading && searchResults.length > 0 && (
-          <p className="text-xs text-gray-500 mt-2">
-            {searchResults.length} results from Deckd and SoundCloud
-          </p>
+          <p className="text-xs text-slate-500 mt-2">{searchResults.length} results from Deckd and SoundCloud</p>
         )}
       </div>
 
-      {/* Search Results */}
       {isSearching ? (
         <div>
-          {searchLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-28"></div>
-              ))}
-            </div>
-          ) : searchResults.length === 0 ? (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-              <p className="text-gray-600 mb-1">No sets found</p>
-              <p className="text-gray-400 text-sm">Try a different search term</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {searchResults.map((set, i) => renderSetCard(set, i))}
-            </div>
-          )}
+          {searchLoading ? <Skeleton /> : searchResults.length === 0
+            ? <EmptyState title="No sets found" subtitle="Try a different search term" />
+            : <div className="space-y-3">{searchResults.map((set, i) => renderSetCard(set, i))}</div>
+          }
         </div>
       ) : (
-        /* Browse Mode */
         <div>
           {/* Sort Options */}
           <div className="flex items-center gap-3 flex-wrap mb-6">
-            <span className="text-sm font-medium text-gray-700">Sort by:</span>
+            <span className="text-sm text-slate-500">Sort by:</span>
             {[
               { value: 'created_at', label: 'Newest' },
               { value: 'title', label: 'Title' },
               { value: 'dj_name', label: 'DJ Name' },
             ].map((option) => (
-              <button
-                key={option.value}
-                onClick={() => handleSortChange(option.value)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  sortBy === option.value
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
+              <button key={option.value} onClick={() => handleSortChange(option.value)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                  sortBy === option.value ? 'bg-primary-600 text-white' : 'bg-surface-700 text-slate-400 hover:bg-surface-600 hover:text-slate-200'
+                }`}>
                 {option.label}
               </button>
             ))}
           </div>
 
-          {/* Count */}
           {pagination.total > 0 && (
-            <p className="text-sm text-gray-500 mb-4">
-              {dbSets.length} of {pagination.total} sets
-            </p>
+            <p className="text-sm text-slate-500 mb-4">{dbSets.length} of {pagination.total} sets</p>
           )}
 
-          {/* Sets List */}
-          {dbLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-28"></div>
-              ))}
-            </div>
-          ) : dbError ? (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-              {dbError}
-            </div>
-          ) : dbSets.length === 0 ? (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-              <p className="text-gray-600 mb-1">No sets yet</p>
-              <p className="text-gray-400 text-sm">
-                Search above to find and import sets from SoundCloud
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {dbSets.map((set, i) => renderSetCard({
-                ...set,
-                _source: 'db',
-                _dbId: set.id,
-              }, i))}
-            </div>
-          )}
+          {dbLoading ? <Skeleton />
+            : dbError ? (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl">{dbError}</div>
+            ) : dbSets.length === 0 ? (
+              <EmptyState title="No sets yet" subtitle="Search above to find and import sets from SoundCloud" />
+            ) : (
+              <div className="space-y-3">
+                {dbSets.map((set, i) => renderSetCard({ ...set, _source: 'db', _dbId: set.id }, i))}
+              </div>
+            )
+          }
 
-          {/* Pagination */}
-          {pagination.pages > 1 && (
-            <div className="flex items-center justify-center space-x-2 mt-6">
-              <button
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                disabled={pagination.page === 1}
-                className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                Previous
-              </button>
-              <span className="px-4 py-2 text-sm text-gray-600">
-                Page {pagination.page} of {pagination.pages}
-              </span>
-              <button
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                disabled={pagination.page >= pagination.pages}
-                className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                Next
-              </button>
-            </div>
-          )}
+          <Pagination page={pagination.page} pages={pagination.pages}
+            onChange={(p) => setPagination(prev => ({ ...prev, page: p }))} />
         </div>
       )}
     </div>

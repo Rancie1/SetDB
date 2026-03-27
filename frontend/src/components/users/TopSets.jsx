@@ -19,7 +19,7 @@ const TopSets = ({ topSets, loading, isOwnProfile, userId }) => {
 
   if (!topSets || topSets.length === 0) {
     return (
-      <div className="text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="text-center py-8 bg-surface-800 rounded-xl border border-white/5">
         <p className="text-gray-500">
           {isOwnProfile 
             ? "You haven't selected any top sets yet. Mark sets as your favorites to display them here!"

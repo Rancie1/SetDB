@@ -141,14 +141,14 @@ const SearchUsersPage = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+      <div className="mb-6">
         <form onSubmit={handleSearch} className="flex gap-4">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by username or display name..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="flex-1 px-4 py-3 bg-surface-800 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
           />
           <button
             type="submit"
@@ -165,7 +165,7 @@ const SearchUsersPage = () => {
                 setPagination({ page: 1, limit: 20, total: 0, pages: 0 });
                 setFriendStatuses({});
               }}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2 rounded-md"
+              className="bg-surface-700 hover:bg-surface-600 text-slate-300 font-medium px-4 py-3 rounded-xl border border-white/5 transition-colors cursor-pointer"
             >
               Clear
             </button>
@@ -189,7 +189,7 @@ const SearchUsersPage = () => {
         {loading ? (
           <div className="space-y-4">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-20"></div>
+              <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-20"></div>
             ))}
           </div>
         ) : error ? (
@@ -218,13 +218,13 @@ const SearchUsersPage = () => {
               return (
                 <div
                   key={user.id}
-                  className="block bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow p-4"
+                  className="block bg-surface-800 rounded-xl border border-white/5 hover:border-primary-500/30 hover:bg-surface-700 transition-colors p-4"
                 >
                   <div className="flex items-center space-x-4">
                     {/* Avatar */}
                     <Link
                       to={`/users/${user.id}`}
-                      className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center text-xl font-bold text-primary-600 flex-shrink-0 hover:bg-primary-200 transition-colors"
+                      className="w-16 h-16 bg-primary-600/20 rounded-full flex items-center justify-center text-xl font-bold text-primary-400 flex-shrink-0 hover:bg-primary-600/30 transition-colors"
                     >
                       {user.username?.[0]?.toUpperCase() || 'U'}
                     </Link>
@@ -234,7 +234,7 @@ const SearchUsersPage = () => {
                       to={`/users/${user.id}`}
                       className="flex-1 min-w-0 hover:opacity-80 transition-opacity"
                     >
-                      <h3 className="text-lg font-semibold text-gray-900 truncate">
+                      <h3 className="text-lg font-semibold text-slate-100 truncate">
                         {user.display_name || user.username}
                       </h3>
                       <p className="text-sm text-gray-600">@{user.username}</p>
@@ -253,7 +253,7 @@ const SearchUsersPage = () => {
                           disabled={isLoading}
                           className={`px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50 ${
                             isFriend
-                              ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                              ? 'bg-surface-700 hover:bg-surface-600 text-slate-300'
                               : 'bg-primary-600 hover:bg-primary-700 text-white'
                           }`}
                         >
@@ -285,7 +285,7 @@ const SearchUsersPage = () => {
           <button
             onClick={() => searchUsers(searchQuery, pagination.page - 1)}
             disabled={pagination.page === 1}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="px-4 py-2 bg-surface-800 border border-white/5 rounded-lg text-slate-300 hover:text-white hover:bg-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             Previous
           </button>
@@ -295,7 +295,7 @@ const SearchUsersPage = () => {
           <button
             onClick={() => searchUsers(searchQuery, pagination.page + 1)}
             disabled={pagination.page >= pagination.pages}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="px-4 py-2 bg-surface-800 border border-white/5 rounded-lg text-slate-300 hover:text-white hover:bg-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             Next
           </button>

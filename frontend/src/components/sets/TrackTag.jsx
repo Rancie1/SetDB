@@ -91,56 +91,56 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
   const isDenied = userConfirmation === false || userConfirmation === "false";
 
   return (
-    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+    <div className="p-3 bg-surface-800 rounded-xl border border-white/5 hover:border-primary-500/20 transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             {track.track_entity_id ? (
               <Link
                 to={`/tracks/${track.track_entity_id}`}
-                className="text-sm font-medium text-gray-900 hover:text-primary-600 transition-colors"
+                className="text-sm font-medium text-slate-200 hover:text-primary-400 transition-colors"
               >
                 {track.track_name}
               </Link>
             ) : (
-              <p className="text-sm font-medium text-gray-900">{track.track_name}</p>
+              <p className="text-sm font-medium text-slate-200">{track.track_name}</p>
             )}
             {(track.timestamp_minutes != null && track.timestamp_minutes !== undefined) && setHasRecording && (
-              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
+              <span className="text-xs text-slate-500 bg-surface-700 px-2 py-0.5 rounded">
                 {formatTimestamp(track.timestamp_minutes)}
               </span>
             )}
           </div>
           {track.artist_name && (
-            <p className="text-xs text-gray-600 mb-2">
+            <p className="text-xs text-slate-500 mb-2">
               <ArtistLink name={track.artist_name} />
             </p>
           )}
-          
+
           {/* Rating and Confirmation Stats */}
-          <div className="flex items-center gap-3 text-xs text-gray-500 mt-2 flex-wrap">
+          <div className="flex items-center gap-3 text-xs text-slate-500 mt-2 flex-wrap">
             {track.average_rating && (
-              <span className="text-yellow-600">⭐ {track.average_rating.toFixed(1)} ({track.rating_count || 0})</span>
+              <span className="text-accent-400">{track.average_rating.toFixed(1)} ({track.rating_count || 0})</span>
             )}
             {track.confirmation_count > 0 && (
-              <span className="text-green-600">✓ {track.confirmation_count} confirmed</span>
+              <span className="text-green-400">{track.confirmation_count} confirmed</span>
             )}
             {track.denial_count > 0 && (
-              <span className="text-red-600">✗ {track.denial_count} denied</span>
+              <span className="text-red-400">{track.denial_count} denied</span>
             )}
           </div>
-          
+
           {/* Track Rating */}
           {isAuthenticated && (
             <div className="mt-2">
               {rating ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600">
-                    Your rating: <span className="font-semibold text-yellow-600">⭐ {rating.toFixed(1)}</span>
+                  <span className="text-xs text-slate-500">
+                    Your rating: <span className="font-semibold text-accent-400">{rating.toFixed(1)}</span>
                   </span>
                   <button
                     onClick={() => setShowRatingSelector(!showRatingSelector)}
-                    className="text-xs text-primary-600 hover:text-primary-700"
+                    className="text-xs text-primary-400 hover:text-primary-300 cursor-pointer"
                   >
                     Change
                   </button>
@@ -148,12 +148,12 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
               ) : (
                 <button
                   onClick={() => setShowRatingSelector(!showRatingSelector)}
-                  className="text-xs text-primary-600 hover:text-primary-700"
+                  className="text-xs text-primary-400 hover:text-primary-300 cursor-pointer"
                 >
                   Rate this track
                 </button>
               )}
-              
+
               {showRatingSelector && (
                 <div className="mt-2 flex items-center gap-1 flex-wrap">
                   {[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0].map((starValue) => (
@@ -180,10 +180,10 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
                         }
                       }}
                       disabled={ratingLoading}
-                      className={`text-sm px-1 py-0.5 rounded ${
+                      className={`text-sm px-1 py-0.5 rounded cursor-pointer ${
                         rating && starValue <= rating
-                          ? 'text-yellow-500 font-bold'
-                          : 'text-gray-400 hover:text-yellow-300'
+                          ? 'text-accent-400 font-bold'
+                          : 'text-slate-600 hover:text-accent-400'
                       } disabled:opacity-50`}
                       title={`${starValue} stars`}
                     >
@@ -192,7 +192,7 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
                   ))}
                   <button
                     onClick={() => setShowRatingSelector(false)}
-                    className="text-xs text-gray-500 ml-2"
+                    className="text-xs text-slate-500 ml-2 cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -201,29 +201,28 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
             </div>
           )}
         </div>
-        
+
         <div className="flex items-center gap-2">
           {track.soundcloud_url && (
             <a
               href={track.soundcloud_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium rounded-md transition-colors"
+              className="inline-flex items-center px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 text-xs font-medium rounded-lg transition-colors"
             >
-              <span className="mr-1.5">🎵</span>
-              SoundCloud
+              SC
             </a>
           )}
-          
+
           {isAuthenticated && (
             <div className="flex items-center gap-1">
               <button
                 onClick={() => handleConfirm(true)}
                 disabled={confirming}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                className={`px-2 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
                   isConfirmed
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-green-100'
+                    ? 'bg-green-500/30 text-green-300 border border-green-500/40'
+                    : 'bg-surface-700 text-slate-400 hover:bg-green-500/20 hover:text-green-400 border border-white/5'
                 } disabled:opacity-50`}
                 title="Confirm this track is correct"
               >
@@ -232,10 +231,10 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
               <button
                 onClick={() => handleConfirm(false)}
                 disabled={confirming}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                className={`px-2 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
                   isDenied
-                    ? 'bg-red-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-red-100'
+                    ? 'bg-red-500/30 text-red-300 border border-red-500/40'
+                    : 'bg-surface-700 text-slate-400 hover:bg-red-500/20 hover:text-red-400 border border-white/5'
                 } disabled:opacity-50`}
                 title="Deny this track is incorrect"
               >
@@ -243,7 +242,7 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
               </button>
             </div>
           )}
-          
+
           {canDelete && onDelete && (
             <button
               onClick={(e) => {
@@ -251,7 +250,7 @@ const TrackTag = ({ track, onDelete, canDelete, onConfirmationChange, setHasReco
                 e.stopPropagation();
                 onDelete(track.id);
               }}
-              className="ml-2 text-red-600 hover:text-red-700 text-sm font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
+              className="ml-2 text-red-400 hover:text-red-300 text-sm font-medium px-2 py-1 rounded hover:bg-red-500/10 transition-colors cursor-pointer"
               title="Remove track tag"
             >
               ×

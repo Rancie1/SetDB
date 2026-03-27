@@ -96,8 +96,8 @@ const GoogleCallbackPage = () => {
   }, [searchParams, navigate, handleGoogleCallback, hasProcessed, isAuthenticated]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
+    <div className="min-h-screen bg-surface-900 flex items-center justify-center">
+      <div className="max-w-md w-full bg-surface-800 rounded-xl border border-white/5 p-8 text-center">
         <div className="mb-4">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
