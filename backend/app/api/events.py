@@ -739,8 +739,11 @@ async def import_ra_event(
     if existing:
         return existing
 
+    # ra_event_id is the event's own numeric ID (differs from the listing ID in ra_id)
+    ra_event_id = body.get("ra_event_id") or ra_id
+
     try:
-        parsed = await ra_service.fetch_event(str(ra_id))
+        parsed = await ra_service.fetch_event(ra_event_id)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"RA API error: {str(e)}")
 

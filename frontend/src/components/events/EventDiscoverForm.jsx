@@ -95,7 +95,7 @@ const EventDiscoverForm = () => {
       let response;
       if (activeSource === 'RA') {
         const raId = event.external_id.replace('ra_', '');
-        response = await importRAEvent(raId);
+        response = await importRAEvent(raId, event.ra_event_id);
       } else if (activeSource === 'Ticketmaster') {
         const tmId = event.external_id.replace('tm_', '');
         response = await importTicketmasterEvent(tmId);

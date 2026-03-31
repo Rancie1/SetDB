@@ -214,12 +214,11 @@ async def search_events(
         "page_size": page_size,
     }
 
-
-async def fetch_event(ra_id: str) -> Optional[dict]:
-    """Fetch a single RA event by its event ID."""
+async def fetch_event(event_id: str) -> Optional[dict]:
+    """Fetch a single RA event by its numeric event ID."""
     payload = {
         "query": _SINGLE_EVENT_QUERY,
-        "variables": {"id": ra_id},
+        "variables": {"id": event_id},
     }
 
     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -275,8 +274,10 @@ def parse_ra_event(raw: dict) -> dict:
     title_parts = [p for p in [artist_names or event_title, f"at {venue_name}" if venue_name else None] if p]
     title = " ".join(title_parts)
 
-    # Use event id for external_id (listing id if available)
-    event_id = raw.get("_listing_id") or raw.get("id")
+    # Use listing id for external_id dedup; keep the event's own id for fetching
+    listing_id = raw.get("_listing_id")
+    event_node_id = raw.get("id")
+    external_id_suffix = listing_id or event_node_id
 
     return {
         "title": title,
@@ -287,5 +288,7 @@ def parse_ra_event(raw: dict) -> dict:
         "thumbnail_url": thumbnail_url,
         "description": None,
         "ticket_url": ticket_url,
-        "external_id": f"ra_{event_id}",
+        "external_id": f"ra_{external_id_suffix}",
+        # The event's own node ID, needed for single-event GraphQL fetch
+        "ra_event_id": str(event_node_id) if event_node_id else str(external_id_suffix),
     }

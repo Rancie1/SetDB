@@ -72,7 +72,7 @@ export const searchSkiddleEvents = (keyword, lat, lng, radius = 10, dateFrom, da
   api.get('/events/search/skiddle', { params: { keyword, lat, lng, radius, date_from: dateFrom, date_to: dateTo, limit, offset } });
 
 // Discovery — Import (auth required)
-export const importRAEvent = (raId) => api.post('/events/import/ra', { ra_id: raId });
+export const importRAEvent = (raId, raEventId) => api.post('/events/import/ra', { ra_id: raId, ra_event_id: raEventId || raId });
 
 export const importTicketmasterEvent = (tmId) => api.post('/events/import/ticketmaster', { ticketmaster_id: tmId });
 
