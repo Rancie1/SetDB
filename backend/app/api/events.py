@@ -22,6 +22,10 @@ from app.schemas import (
 )
 from app.auth import get_current_active_user
 from app.core.exceptions import SetNotFoundError, ForbiddenError, ExternalAPIError
+from app.config import settings
+import app.services.ra as ra_service
+import app.services.ticketmaster as tm_service
+import app.services.skiddle as skiddle_service
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -599,5 +603,204 @@ async def create_event_from_set(
         db.add(new_event)
         await db.commit()
         await db.refresh(new_event)
-        
+
         return new_event
+
+
+# ============================================================================
+# EVENT DISCOVERY — SEARCH (no auth required)
+# ============================================================================
+
+@router.get("/search/ra", response_model=dict)
+async def search_ra_events(
+    keyword: Optional[str] = Query(None),
+    location: str = Query(..., description="City name, e.g. 'Berlin'"),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+):
+    """Search Resident Advisor for electronic music events."""
+    try:
+        return await ra_service.search_events(
+            location=location,
+            keyword=keyword,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            page_size=limit,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"RA API error: {str(e)}")
+
+
+@router.get("/search/ticketmaster", response_model=dict)
+async def search_ticketmaster_events(
+    keyword: Optional[str] = Query(None),
+    city: Optional[str] = Query(None),
+    country_code: Optional[str] = Query(None),
+    page: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=50),
+):
+    """Search Ticketmaster for music events."""
+    if not settings.TICKETMASTER_API_KEY:
+        raise HTTPException(status_code=503, detail="Ticketmaster API key not configured")
+    try:
+        return await tm_service.search_events(
+            api_key=settings.TICKETMASTER_API_KEY,
+            keyword=keyword,
+            city=city,
+            country_code=country_code,
+            page=page,
+            limit=limit,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Ticketmaster API error: {str(e)}")
+
+
+@router.get("/search/skiddle", response_model=dict)
+async def search_skiddle_events(
+    keyword: Optional[str] = Query(None),
+    lat: Optional[float] = Query(None),
+    lng: Optional[float] = Query(None),
+    radius: int = Query(10, ge=1, le=100),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+):
+    """Search Skiddle for UK/EU club night events."""
+    if not settings.SKIDDLE_API_KEY:
+        raise HTTPException(status_code=503, detail="Skiddle API key not configured")
+    try:
+        return await skiddle_service.search_events(
+            api_key=settings.SKIDDLE_API_KEY,
+            keyword=keyword,
+            latitude=lat,
+            longitude=lng,
+            radius=radius,
+            date_from=date_from,
+            date_to=date_to,
+            limit=limit,
+            offset=offset,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Skiddle API error: {str(e)}")
+
+
+# ============================================================================
+# EVENT DISCOVERY — IMPORT (auth required)
+# ============================================================================
+
+async def _get_or_create_event(db: AsyncSession, parsed: dict, current_user: User) -> Event:
+    """Check for existing external_id, create Event if not found."""
+    external_id = parsed.get("external_id")
+    if external_id:
+        result = await db.execute(select(Event).where(Event.external_id == external_id))
+        existing = result.scalar_one_or_none()
+        if existing:
+            return existing
+
+    new_event = Event(
+        title=parsed["title"],
+        dj_name=parsed["dj_name"],
+        event_name=parsed.get("event_name"),
+        event_date=parsed.get("event_date"),
+        venue_location=parsed.get("venue_location"),
+        description=parsed.get("description"),
+        thumbnail_url=parsed.get("thumbnail_url"),
+        ticket_url=parsed.get("ticket_url"),
+        external_id=external_id,
+        created_by_id=current_user.id,
+        is_verified=False,
+        confirmation_count=0,
+    )
+    db.add(new_event)
+    await db.commit()
+    await db.refresh(new_event)
+    return new_event
+
+
+@router.post("/import/ra", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
+async def import_ra_event(
+    body: dict = Body(..., example={"ra_id": "123456"}),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Import an event from Resident Advisor by its RA event ID."""
+    ra_id = body.get("ra_id")
+    if not ra_id:
+        raise HTTPException(status_code=422, detail="ra_id is required")
+
+    # Check dedup first
+    external_id = f"ra_{ra_id}"
+    result = await db.execute(select(Event).where(Event.external_id == external_id))
+    existing = result.scalar_one_or_none()
+    if existing:
+        return existing
+
+    try:
+        parsed = await ra_service.fetch_event(str(ra_id))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"RA API error: {str(e)}")
+
+    if not parsed:
+        raise HTTPException(status_code=404, detail=f"RA event {ra_id} not found")
+
+    return await _get_or_create_event(db, parsed, current_user)
+
+
+@router.post("/import/ticketmaster", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
+async def import_ticketmaster_event(
+    body: dict = Body(..., example={"ticketmaster_id": "Z698xZC2Z17..."}),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Import an event from Ticketmaster by its event ID."""
+    if not settings.TICKETMASTER_API_KEY:
+        raise HTTPException(status_code=503, detail="Ticketmaster API key not configured")
+
+    tm_id = body.get("ticketmaster_id")
+    if not tm_id:
+        raise HTTPException(status_code=422, detail="ticketmaster_id is required")
+
+    external_id = f"tm_{tm_id}"
+    result = await db.execute(select(Event).where(Event.external_id == external_id))
+    existing = result.scalar_one_or_none()
+    if existing:
+        return existing
+
+    try:
+        parsed = await tm_service.fetch_event(settings.TICKETMASTER_API_KEY, str(tm_id))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Ticketmaster API error: {str(e)}")
+
+    return await _get_or_create_event(db, parsed, current_user)
+
+
+@router.post("/import/skiddle", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
+async def import_skiddle_event(
+    body: dict = Body(..., example={"skiddle_id": "13519767"}),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Import an event from Skiddle by its event ID."""
+    if not settings.SKIDDLE_API_KEY:
+        raise HTTPException(status_code=503, detail="Skiddle API key not configured")
+
+    skiddle_id = body.get("skiddle_id")
+    if not skiddle_id:
+        raise HTTPException(status_code=422, detail="skiddle_id is required")
+
+    external_id = f"skiddle_{skiddle_id}"
+    result = await db.execute(select(Event).where(Event.external_id == external_id))
+    existing = result.scalar_one_or_none()
+    if existing:
+        return existing
+
+    try:
+        parsed = await skiddle_service.fetch_event(settings.SKIDDLE_API_KEY, str(skiddle_id))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Skiddle API error: {str(e)}")
+
+    return await _get_or_create_event(db, parsed, current_user)

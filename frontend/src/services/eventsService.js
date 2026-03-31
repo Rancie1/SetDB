@@ -60,3 +60,20 @@ export const getUserConfirmedEvents = async (userId, page = 1, limit = 20) => {
     params: { page, limit },
   });
 };
+
+// Discovery — Search (no auth required)
+export const searchRAEvents = (keyword, location, dateFrom, dateTo, page = 1, limit = 20) =>
+  api.get('/events/search/ra', { params: { keyword, location, date_from: dateFrom, date_to: dateTo, page, limit } });
+
+export const searchTicketmasterEvents = (keyword, city, countryCode, page = 0, limit = 20) =>
+  api.get('/events/search/ticketmaster', { params: { keyword, city, country_code: countryCode, page, limit } });
+
+export const searchSkiddleEvents = (keyword, lat, lng, radius = 10, dateFrom, dateTo, limit = 20, offset = 0) =>
+  api.get('/events/search/skiddle', { params: { keyword, lat, lng, radius, date_from: dateFrom, date_to: dateTo, limit, offset } });
+
+// Discovery — Import (auth required)
+export const importRAEvent = (raId) => api.post('/events/import/ra', { ra_id: raId });
+
+export const importTicketmasterEvent = (tmId) => api.post('/events/import/ticketmaster', { ticketmaster_id: tmId });
+
+export const importSkiddleEvent = (skiddleId) => api.post('/events/import/skiddle', { skiddle_id: skiddleId });

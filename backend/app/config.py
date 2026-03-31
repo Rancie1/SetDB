@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     SPOTIFY_CLIENT_SECRET: Optional[str] = None
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
+    TICKETMASTER_API_KEY: Optional[str] = None
+    SKIDDLE_API_KEY: Optional[str] = None
     
     # OAuth Redirect URLs
     SOUNDCLOUD_REDIRECT_URI: Optional[str] = None  # e.g., "http://localhost:5173/auth/soundcloud/callback"

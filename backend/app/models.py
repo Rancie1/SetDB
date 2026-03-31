@@ -714,7 +714,11 @@ class Event(Base):
     # Media information
     thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    
+
+    # External source fields
+    ticket_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    external_id: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, unique=True)
+
     # Verification fields
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     confirmation_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

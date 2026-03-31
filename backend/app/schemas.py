@@ -570,6 +570,8 @@ class EventBase(BaseSchema):
     venue_location: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = None
     thumbnail_url: Optional[str] = None
+    ticket_url: Optional[str] = Field(None, max_length=500)
+    external_id: Optional[str] = Field(None, max_length=200)
 
 
 class EventCreate(EventBase):
