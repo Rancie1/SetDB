@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import * as eventsService from '../services/eventsService';
+import { getAttendance, markAttended, unmarkAttended } from '../services/eventsService';
 import * as setsService from '../services/setsService';
 import * as usersService from '../services/usersService';
 import ArtistLink from '../components/shared/ArtistLink';
@@ -27,15 +28,15 @@ const EventDetailsPage = () => {
   const [linkedSetsLoading, setLinkedSetsLoading] = useState(false);
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [linkingSet, setLinkingSet] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [selectedSetId, setSelectedSetId] = useState(null);
+  const [selectedSet, setSelectedSet] = useState(null); // { id?, soundcloud_url?, title, dj_name, _source }
   const [isInTop5, setIsInTop5] = useState(false);
   const [topEventOrder, setTopEventOrder] = useState(null);
   const [topEventLoading, setTopEventLoading] = useState(false);
+  const [attended, setAttended] = useState(false);
+  const [attendedLoading, setAttendedLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -46,10 +47,37 @@ const EventDetailsPage = () => {
 
   useEffect(() => {
     if (event && isAuthenticated && user) {
-      checkConfirmation();
       checkTopEvent();
+      checkAttendance();
     }
   }, [event, isAuthenticated, user]);
+
+  const checkAttendance = async () => {
+    try {
+      const res = await getAttendance(id);
+      setAttended(res.data.attended);
+    } catch {
+      setAttended(false);
+    }
+  };
+
+  const handleToggleAttended = async () => {
+    if (attendedLoading) return;
+    setAttendedLoading(true);
+    try {
+      if (attended) {
+        await unmarkAttended(id);
+        setAttended(false);
+      } else {
+        await markAttended(id);
+        setAttended(true);
+      }
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to update attendance');
+    } finally {
+      setAttendedLoading(false);
+    }
+  };
 
   const checkTopEvent = async () => {
     if (!user || !event) return;
@@ -119,36 +147,6 @@ const EventDetailsPage = () => {
     }
   };
 
-  const checkConfirmation = async () => {
-    if (!event || !isAuthenticated) {
-      setIsConfirmed(false);
-      return;
-    }
-    setIsConfirmed(false);
-  };
-
-  const handleConfirmEvent = async () => {
-    if (!event || !isAuthenticated || confirming) return;
-
-    setConfirming(true);
-    try {
-      if (isConfirmed) {
-        await eventsService.unconfirmEvent(event.id);
-        setIsConfirmed(false);
-        await loadEvent();
-      } else {
-        await eventsService.confirmEvent(event.id);
-        setIsConfirmed(true);
-        await loadEvent();
-      }
-    } catch (err) {
-      console.error('Failed to confirm/unconfirm event:', err);
-      alert(err.response?.data?.detail || 'Failed to update confirmation');
-    } finally {
-      setConfirming(false);
-    }
-  };
-
   const searchSets = async () => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -157,8 +155,20 @@ const EventDetailsPage = () => {
 
     setSearching(true);
     try {
-      const response = await setsService.getSets({ search: searchQuery }, 1, 10);
-      setSearchResults(response.data.items || []);
+      const [dbRes, scRes] = await Promise.allSettled([
+        setsService.getSets({ search: searchQuery }, 1, 10),
+        setsService.searchSoundCloudSets(searchQuery, 10),
+      ]);
+
+      const dbSets = dbRes.status === 'fulfilled'
+        ? (dbRes.value.data?.items ?? []).map((s) => ({ ...s, _source: 'db' }))
+        : [];
+
+      const scSets = scRes.status === 'fulfilled'
+        ? (scRes.value.data ?? []).map((s) => ({ ...s, _source: 'soundcloud' }))
+        : [];
+
+      setSearchResults([...dbSets, ...scSets]);
     } catch (err) {
       console.error('Failed to search sets:', err);
       setSearchResults([]);
@@ -175,16 +185,24 @@ const EventDetailsPage = () => {
   }, [searchQuery]);
 
   const handleLinkSet = async () => {
-    if (!event || !selectedSetId) return;
+    if (!event || !selectedSet) return;
 
     setLinkingSet(true);
     try {
-      await eventsService.linkSetToEvent(event.id, selectedSetId);
+      let setId = selectedSet.id;
+
+      // SoundCloud result — import into DB first, then link
+      if (selectedSet._source === 'soundcloud') {
+        const imported = await setsService.importSetFromSoundCloud(selectedSet.soundcloud_url);
+        setId = imported.data.id;
+      }
+
+      await eventsService.linkSetToEvent(event.id, setId);
       await loadLinkedSets();
       setShowLinkForm(false);
       setSearchQuery('');
       setSearchResults([]);
-      setSelectedSetId(null);
+      setSelectedSet(null);
     } catch (err) {
       console.error('Failed to link set:', err);
       alert(err.response?.data?.detail || 'Failed to link set to event');
@@ -277,12 +295,7 @@ const EventDetailsPage = () => {
                 </div>
               )}
               <div className="absolute top-3 right-3">
-                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border ${
-                  event.is_verified
-                    ? 'bg-green-500/20 text-green-300 border-green-500/30'
-                    : 'bg-violet-500/20 text-violet-300 border-violet-500/30'
-                }`}>
-                  {event.is_verified && <span className="mr-1">✓</span>}
+                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border bg-violet-500/20 text-violet-300 border-violet-500/30">
                   Live Event
                 </span>
               </div>
@@ -300,66 +313,36 @@ const EventDetailsPage = () => {
               </p>
             )}
 
-            {/* Verification Status */}
-            <div className="mb-4 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
-              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  {event.is_verified ? (
-                    <>
-                      <span className="text-green-400">✓</span>
-                      <span className="font-medium text-green-400">Verified Event</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-yellow-400">⚠</span>
-                      <span className="font-medium text-yellow-400">Unverified Event</span>
-                    </>
-                  )}
-                </div>
-                {isAuthenticated && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={handleConfirmEvent}
-                      disabled={confirming}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                        isConfirmed
-                          ? 'bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30'
-                          : 'bg-surface-700 text-slate-400 hover:text-slate-200 border border-white/5'
-                      } disabled:opacity-50`}
-                    >
-                      {confirming ? '...' : isConfirmed ? '✓ Confirmed' : 'Confirm Attendance'}
-                    </button>
-                    {isInTop5 ? (
-                      <button
-                        onClick={handleRemoveFromTop5}
-                        disabled={topEventLoading}
-                        className="px-3 py-1 rounded-lg text-sm font-medium bg-primary-600/20 text-primary-300 border border-primary-500/30 hover:bg-primary-600/30 disabled:opacity-50 cursor-pointer transition-colors"
-                      >
-                        {topEventLoading ? '...' : `#${topEventOrder} in Top 5 — Remove`}
-                      </button>
-                    ) : (
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((order) => (
-                          <button
-                            key={order}
-                            onClick={() => handleAddToTop5(order)}
-                            disabled={topEventLoading}
-                            className="px-2 py-1 rounded-lg text-xs font-medium bg-primary-600 text-white hover:bg-primary-500 disabled:opacity-50 cursor-pointer transition-colors"
-                          >
-                            #{order}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+            {/* Top 5 Actions */}
+            {isAuthenticated && (
+              <div className="mb-4 flex items-center gap-2 flex-wrap">
+                {isInTop5 ? (
+                  <button
+                    onClick={handleRemoveFromTop5}
+                    disabled={topEventLoading}
+                    className="px-3 py-1 rounded-lg text-sm font-medium bg-primary-600/20 text-primary-300 border border-primary-500/30 hover:bg-primary-600/30 disabled:opacity-50 cursor-pointer transition-colors"
+                  >
+                    {topEventLoading ? '...' : `#${topEventOrder} in Top 5 — Remove`}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-500">Add to Top 5:</span>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((order) => (
+                        <button
+                          key={order}
+                          onClick={() => handleAddToTop5(order)}
+                          disabled={topEventLoading}
+                          className="px-2 py-1 rounded-lg text-xs font-medium bg-primary-600 text-white hover:bg-primary-500 disabled:opacity-50 cursor-pointer transition-colors"
+                        >
+                          #{order}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-              {event.confirmation_count > 0 && (
-                <p className="text-sm text-slate-400">
-                  {event.confirmation_count} {event.confirmation_count === 1 ? 'person has' : 'people have'} confirmed attending this event
-                </p>
-              )}
-            </div>
+            )}
 
             {/* Metadata */}
             <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-slate-500">
@@ -386,6 +369,19 @@ const EventDetailsPage = () => {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-3">
+              {isAuthenticated && (
+                <button
+                  onClick={handleToggleAttended}
+                  disabled={attendedLoading}
+                  className={`inline-flex items-center px-4 py-2 font-medium rounded-xl transition-colors cursor-pointer disabled:opacity-50 ${
+                    attended
+                      ? 'bg-green-600/20 text-green-300 border border-green-500/30 hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/30'
+                      : 'bg-surface-700 hover:bg-surface-600 text-slate-300 border border-white/10'
+                  }`}
+                >
+                  {attendedLoading ? '...' : attended ? 'Attended' : 'Mark as Attended'}
+                </button>
+              )}
               {isAuthenticated && (
                 <button
                   onClick={() => setShowLinkForm(!showLinkForm)}
@@ -436,21 +432,42 @@ const EventDetailsPage = () => {
                 )}
 
                 {searchResults.length > 0 && (
-                  <div className="bg-surface-700 border border-white/10 rounded-lg max-h-60 overflow-y-auto">
-                    {searchResults.map((set) => (
-                      <div
-                        key={set.id}
-                        onClick={() => setSelectedSetId(set.id)}
-                        className={`p-3 border-b border-white/5 last:border-b-0 cursor-pointer transition-colors ${
-                          selectedSetId === set.id
-                            ? 'bg-primary-600/20'
-                            : 'hover:bg-surface-600'
-                        }`}
-                      >
-                        <div className="font-medium text-slate-200">{set.title}</div>
-                        <div className="text-sm text-slate-500">{set.dj_name}</div>
-                      </div>
-                    ))}
+                  <div className="bg-surface-700 border border-white/10 rounded-lg max-h-72 overflow-y-auto">
+                    {searchResults.map((set, idx) => {
+                      const key = set._source === 'soundcloud' ? `sc_${set.id ?? idx}` : set.id;
+                      const isSelected = selectedSet && (
+                        set._source === 'soundcloud'
+                          ? selectedSet.soundcloud_url === set.soundcloud_url
+                          : selectedSet.id === set.id
+                      );
+                      return (
+                        <div
+                          key={key}
+                          onClick={() => setSelectedSet(set)}
+                          className={`flex items-center gap-3 p-3 border-b border-white/5 last:border-b-0 cursor-pointer transition-colors ${
+                            isSelected ? 'bg-primary-600/20' : 'hover:bg-surface-600'
+                          }`}
+                        >
+                          {set.thumbnail_url && (
+                            <img
+                              src={set.thumbnail_url}
+                              alt={set.title}
+                              className="w-10 h-10 object-cover rounded flex-shrink-0"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-slate-200 truncate">{set.title}</div>
+                            <div className="text-xs text-slate-500">{set.dj_name || set.artist_name}</div>
+                          </div>
+                          {set._source === 'soundcloud' && (
+                            <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                              SC
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -461,7 +478,7 @@ const EventDetailsPage = () => {
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={handleLinkSet}
-                    disabled={!selectedSetId || linkingSet}
+                    disabled={!selectedSet || linkingSet}
                     className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-surface-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors cursor-pointer"
                   >
                     {linkingSet ? 'Linking...' : 'Link Selected Set'}
@@ -471,7 +488,7 @@ const EventDetailsPage = () => {
                       setShowLinkForm(false);
                       setSearchQuery('');
                       setSearchResults([]);
-                      setSelectedSetId(null);
+                      setSelectedSet(null);
                     }}
                     disabled={linkingSet}
                     className="px-4 py-2 bg-surface-700 hover:bg-surface-600 text-slate-300 font-medium rounded-xl border border-white/5 transition-colors cursor-pointer"
@@ -558,14 +575,6 @@ const EventDetailsPage = () => {
           <div className="bg-surface-800 rounded-xl border border-white/5 p-6">
             <h3 className="text-lg font-semibold text-slate-100 mb-4">Event Details</h3>
             <dl className="space-y-3 text-sm">
-              <div>
-                <dt className="text-slate-500">Status</dt>
-                <dd className="font-medium text-slate-200">{event.is_verified ? 'Verified' : 'Unverified'}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Confirmations</dt>
-                <dd className="font-medium text-slate-200">{event.confirmation_count || 0}</dd>
-              </div>
               <div>
                 <dt className="text-slate-500">Linked Sets</dt>
                 <dd className="font-medium text-slate-200">{linkedSets.length}</dd>

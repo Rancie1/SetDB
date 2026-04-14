@@ -702,6 +702,7 @@ async def add_top_event(
     )
     for row in existing.scalars().all():
         await db.delete(row)
+    await db.flush()  # push deletes before the insert to avoid unique constraint violation
     db.add(UserTopEvent(user_id=current_user.id, event_id=event_id, order=order))
     await db.commit()
     return {"event_id": str(event_id), "order": order}

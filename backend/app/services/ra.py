@@ -92,8 +92,9 @@ query SEARCH_AREAS($searchTerm: String, $limit: Int) {
 """
 
 
-async def area_id_for_name(city: str) -> Optional[int]:
-    """Resolve a city name to an RA area integer ID."""
+
+async def area_ids_for_name(city: str) -> list[int]:
+    """Resolve a city name to a list of RA area integer IDs (up to 5)."""
     payload = {
         "query": _AREA_SEARCH_QUERY,
         "variables": {"searchTerm": city, "limit": 5},
@@ -104,10 +105,89 @@ async def area_id_for_name(city: str) -> Optional[int]:
         data = response.json()
 
     areas = data.get("data", {}).get("areas") or []
-    if not areas:
-        return None
-    # Return the first match's ID as int
-    return int(areas[0]["id"])
+    return [int(a["id"]) for a in areas if a.get("id")]
+
+
+async def area_id_for_name(city: str) -> Optional[int]:
+    """Resolve a city name to an RA area integer ID (first match only)."""
+    ids = await area_ids_for_name(city)
+    return ids[0] if ids else None
+
+
+import asyncio
+import re as _re
+
+_STOP_WORDS = {"and", "the", "at", "in", "of", "a", "an", "&", "for", "with"}
+
+
+def _keyword_words(keyword: str) -> list:
+    """Split a keyword into significant words for matching."""
+    return [
+        w for w in keyword.lower().split()
+        if w not in _STOP_WORDS
+        and len(w) > 1
+        and not _re.match(r"^\d{4}$", w)
+    ]
+
+
+def _keyword_matches(r: dict, words: list) -> bool:
+    combined = " ".join([
+        r.get("title") or "",
+        r.get("dj_name") or "",
+        r.get("event_name") or "",
+        r.get("venue_location") or "",
+    ]).lower()
+    return all(w in combined for w in words)
+
+
+async def _fetch_listings(filters: dict, pages_to_fetch: int, fetch_from_start: bool) -> list:
+    """Fetch raw parsed events from RA for the given filters."""
+    fetch_size = 100
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        count_resp = await client.post(
+            RA_GRAPHQL_URL,
+            json={"query": _EVENTS_QUERY, "variables": {"filters": filters, "pageSize": 1, "page": 1}},
+            headers=_HEADERS,
+        )
+        count_resp.raise_for_status()
+        total_results = (
+            count_resp.json().get("data", {}).get("eventListings", {}).get("totalResults", 0)
+        ) or 0
+
+        last_page = max(1, -(-total_results // fetch_size))
+        if fetch_from_start:
+            target_pages = list(range(1, min(pages_to_fetch + 1, last_page + 1)))
+        else:
+            target_pages = list(range(max(1, last_page - pages_to_fetch + 1), last_page + 1))
+
+        async def fetch_page(p):
+            resp = await client.post(
+                RA_GRAPHQL_URL,
+                json={"query": _EVENTS_QUERY, "variables": {"filters": filters, "pageSize": fetch_size, "page": p}},
+                headers=_HEADERS,
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+        pages_data = await asyncio.gather(*[fetch_page(p) for p in target_pages])
+
+    seen_event_ids: set = set()
+    results = []
+    for data in pages_data:
+        for listing in data.get("data", {}).get("eventListings", {}).get("data", []):
+            event = listing.get("event")
+            if not event:
+                continue
+            node_id = event.get("id")
+            if node_id and node_id in seen_event_ids:
+                continue
+            if node_id:
+                seen_event_ids.add(node_id)
+            event["_listing_id"] = listing.get("id")
+            results.append(parse_ra_event(event))
+
+    return results
 
 
 async def search_events(
@@ -118,90 +198,54 @@ async def search_events(
     page: int = 1,
     page_size: int = 20,
 ) -> dict:
-    """Search RA events by location (city name) and optional keyword/date range.
-
-    RA's GraphQL title filter only supports exact match, so when a keyword is
-    provided we fetch a larger batch and filter client-side.
-    """
-    area_id = await area_id_for_name(location)
-    if area_id is None:
-        return {"results": [], "total": 0, "page": page, "page_size": page_size}
-
-    filters: dict = {"areas": {"any": [area_id]}}
-
-    # Always apply a date window. Default to last 5 years → today if not specified,
-    # so results are relevant rather than showing events from the early 2000s.
-    from datetime import datetime, timedelta
+    """Search RA events by location (city name) and optional keyword/date range."""
+    from datetime import timedelta
     today = date.today()
-    effective_from = date_from or (today - timedelta(days=730))  # default: last 2 years
-    effective_to = date_to or today
 
-    filters["listingDate"] = {
-        "gte": f"{effective_from.isoformat()}T00:00:00",
-        "lte": f"{effective_to.isoformat()}T23:59:59",
+    # ── date window ──────────────────────────────────────────────────────────
+    if keyword:
+        effective_from = date_from or (today - timedelta(days=548))  # ~18 months back
+        effective_to   = date_to   or (today + timedelta(days=365))  # 1 year ahead
+        pages_to_fetch = 20
+        fetch_from_start = True
+    else:
+        effective_from = date_from or (today - timedelta(days=730))
+        effective_to   = date_to   or today
+        pages_to_fetch = 1
+        fetch_from_start = False
+
+    date_filter = {
+        "listingDate": {
+            "gte": f"{effective_from.isoformat()}T00:00:00",
+            "lte": f"{effective_to.isoformat()}T23:59:59",
+        }
     }
 
-    fetch_size = 100  # RA's max page size
-    # Busy cities (e.g. Melbourne) have 300+ events/month, so the last page
-    # only covers a few days. When keyword-searching, pull the last 5 pages
-    # (~500 events ≈ last 6-8 weeks) to cover a reasonable lookback window.
-    pages_to_fetch = 5 if keyword else 1
+    # ── city-scoped search (all matching areas in parallel) ──────────────────
+    area_ids = await area_ids_for_name(location)
+    words = _keyword_words(keyword) if keyword else []
 
-    import asyncio
+    results: list = []
+    if area_ids:
+        # Fetch each area in parallel and merge, deduplicating by ra_event_id
+        area_batches = await asyncio.gather(*[
+            _fetch_listings({"areas": {"any": [aid]}, **date_filter}, pages_to_fetch, fetch_from_start)
+            for aid in area_ids
+        ])
+        seen_ra_ids: set = set()
+        for _, batch in zip(area_ids, area_batches):
+            for r in batch:
+                rid = r.get("ra_event_id") or r.get("external_id")
+                if rid and rid in seen_ra_ids:
+                    continue
+                seen_ra_ids.add(rid)
+                results.append(r)
 
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        # Step 1: get total count so we can jump to the last N pages
-        count_payload = {
-            "query": _EVENTS_QUERY,
-            "variables": {"filters": filters, "pageSize": 1, "page": 1},
-        }
-        count_resp = await client.post(RA_GRAPHQL_URL, json=count_payload, headers=_HEADERS)
-        count_resp.raise_for_status()
-        total_results = (
-            count_resp.json()
-            .get("data", {})
-            .get("eventListings", {})
-            .get("totalResults", 0)
-        ) or 0
+    # ── keyword filter ───────────────────────────────────────────────────────
+    if words:
+        results = [r for r in results if _keyword_matches(r, words)]
 
-        last_page = max(1, -(-total_results // fetch_size))  # ceiling division
-        target_pages = list(range(max(1, last_page - pages_to_fetch + 1), last_page + 1))
-
-        # Step 2: fetch target pages concurrently
-        async def fetch_page(p):
-            resp = await client.post(RA_GRAPHQL_URL, json={
-                "query": _EVENTS_QUERY,
-                "variables": {"filters": filters, "pageSize": fetch_size, "page": p},
-            }, headers=_HEADERS)
-            resp.raise_for_status()
-            return resp.json()
-
-        pages_data = await asyncio.gather(*[fetch_page(p) for p in target_pages])
-
-    raw_listings = []
-    for data in pages_data:
-        raw_listings += data.get("data", {}).get("eventListings", {}).get("data", [])
-
-    results = []
-    for listing in raw_listings:
-        event = listing.get("event")
-        if event:
-            event["_listing_id"] = listing.get("id")
-            results.append(parse_ra_event(event))
-
-    # Sort most-recent first
     results.sort(key=lambda r: r.get("event_date") or date.min, reverse=True)
-
-    # Client-side keyword filter
-    if keyword:
-        kw = keyword.lower()
-        results = [
-            r for r in results
-            if kw in (r.get("title") or "").lower()
-            or kw in (r.get("dj_name") or "").lower()
-            or kw in (r.get("event_name") or "").lower()
-            or kw in (r.get("venue_location") or "").lower()
-        ]
 
     filtered_total = len(results)
     start = (page - 1) * page_size
@@ -279,9 +323,17 @@ def parse_ra_event(raw: dict) -> dict:
     event_node_id = raw.get("id")
     external_id_suffix = listing_id or event_node_id
 
+    # Truncate fields that map to VARCHAR(255) columns.
+    # Festival lineups can have hundreds of artists — store a preview in dj_name
+    # and keep the full list available via the event_name / description fields.
+    def _trunc(s: Optional[str], n: int) -> Optional[str]:
+        if s and len(s) > n:
+            return s[:n - 1] + "…"
+        return s
+
     return {
-        "title": title,
-        "dj_name": artist_names or "Unknown",
+        "title": _trunc(title, 255),
+        "dj_name": _trunc(artist_names or "Unknown", 255),
         "event_name": event_title,
         "event_date": event_date,
         "venue_location": venue_location,

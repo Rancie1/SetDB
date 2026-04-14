@@ -16,7 +16,7 @@ import SetsPage from './pages/SetsPage';
 import TracksDiscoverPage from './pages/TracksDiscoverPage';
 import EventsPage from './pages/EventsPage';
 import EventDetailsPage from './pages/EventDetailsPage';
-import CreateEventPage from './pages/CreateEventPage';
+
 import UserProfilePage from './pages/UserProfilePage';
 import SearchUsersPage from './pages/SearchUsersPage';
 import FriendsPage from './pages/FriendsPage';
@@ -113,17 +113,7 @@ function App() {
             </Layout>
           }
         />
-        <Route
-          path="/events/create"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <CreateEventPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
+<Route
           path="/feed"
           element={
             <ProtectedRoute>

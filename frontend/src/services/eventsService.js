@@ -43,12 +43,16 @@ export const unlinkSetFromEvent = async (eventId, setId) => {
   return api.delete(`/events/${eventId}/link-set/${setId}`);
 };
 
-export const confirmEvent = async (eventId) => {
-  return api.post(`/events/${eventId}/confirm`);
+export const getAttendance = async (eventId) => {
+  return api.get(`/events/${eventId}/attended`);
 };
 
-export const unconfirmEvent = async (eventId) => {
-  return api.delete(`/events/${eventId}/confirm`);
+export const markAttended = async (eventId) => {
+  return api.post(`/events/${eventId}/attended`);
+};
+
+export const unmarkAttended = async (eventId) => {
+  return api.delete(`/events/${eventId}/attended`);
 };
 
 export const createEventFromSet = async (setId, eventData = {}) => {

@@ -20,8 +20,6 @@ import * as logsService from '../services/logsService';
 import ReviewCard from '../components/reviews/ReviewCard';
 import ReviewForm from '../components/reviews/ReviewForm';
 import RatingDisplay from '../components/reviews/RatingDisplay';
-import CreateLiveEventForm from '../components/sets/CreateLiveEventForm';
-import LinkToLiveEventForm from '../components/sets/LinkToLiveEventForm';
 import TrackTag from '../components/sets/TrackTag';
 import TrackTagForm from '../components/sets/TrackTagForm';
 import * as tracksService from '../services/tracksService';
@@ -41,18 +39,12 @@ const SetDetailsPage = () => {
   const [ratingStats, setRatingStats] = useState(null);
   const [userRating, setUserRating] = useState(null);
   const [ratingStatsLoading, setRatingStatsLoading] = useState(false);
-  const [showCreateLiveEventForm, setShowCreateLiveEventForm] = useState(false);
-  const [showLinkToLiveEventForm, setShowLinkToLiveEventForm] = useState(false);
-  const [creatingLiveEvent, setCreatingLiveEvent] = useState(false);
-  const [linkingToEvent, setLinkingToEvent] = useState(false);
-  const [markingAsLive, setMarkingAsLive] = useState(false);
   const [userLog, setUserLog] = useState(null);
   const [loggingSet, setLoggingSet] = useState(false);
   const [trackTags, setTrackTags] = useState([]);
   const [trackTagsLoading, setTrackTagsLoading] = useState(false);
   const [showTrackTagForm, setShowTrackTagForm] = useState(false);
   const [settingTopSet, setSettingTopSet] = useState(false);
-  const [showTopSetSelector, setShowTopSetSelector] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -133,14 +125,9 @@ const SetDetailsPage = () => {
       // Compare IDs as strings to handle UUID comparison
       const logForThisSet = logs.find(log => String(log.set_id) === String(id));
       setUserLog(logForThisSet || null);
-      // Close top set selector if log is removed
-      if (!logForThisSet) {
-        setShowTopSetSelector(false);
-      }
     } catch (err) {
       console.error('Failed to load user log:', err);
       setUserLog(null);
-      setShowTopSetSelector(false);
     }
   };
 
@@ -153,10 +140,7 @@ const SetDetailsPage = () => {
     setSettingTopSet(true);
     try {
       await logsService.setTopSet(userLog.id, order);
-      // Reload user log to get updated top set info
       await loadUserLog();
-      setShowTopSetSelector(false);
-      // Optionally reload top sets on profile if user is viewing their own profile
     } catch (error) {
       console.error('Failed to set top set:', error);
       alert(error.response?.data?.detail || 'Failed to add to top sets');
@@ -300,61 +284,6 @@ const SetDetailsPage = () => {
     loadUserRating();
   };
 
-  const handleCreateLiveEvent = async (eventData) => {
-    if (!currentSet) return;
-    
-    setCreatingLiveEvent(true);
-    try {
-      const response = await eventsService.createEventFromSet(currentSet.id, eventData);
-      
-      // Navigate to the new event
-      if (response.data) {
-        navigate(`/events/${response.data.id}`);
-      }
-      
-      setShowCreateLiveEventForm(false);
-    } catch (err) {
-      console.error('Failed to create live event:', err);
-      alert(err.response?.data?.detail || 'Failed to create live event');
-    } finally {
-      setCreatingLiveEvent(false);
-    }
-  };
-
-  const handleMarkAsLive = async () => {
-    if (!confirm('Are you sure you want to mark this set as a live set? The original URL will be saved as the recording.')) {
-      return;
-    }
-    
-    setMarkingAsLive(true);
-    try {
-      await setsService.markSetAsLive(id);
-      // Refresh the set data
-      await fetchSet(id);
-      alert('Set marked as live successfully!');
-    } catch (err) {
-      console.error('Failed to mark set as live:', err);
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to mark set as live';
-      alert(`Error: ${errorMessage}\n\nPossible reasons:\n- Set is already a live set\n- Only YouTube and SoundCloud sets can be marked as live\n- Only the creator can mark sets as live`);
-    } finally {
-      setMarkingAsLive(false);
-    }
-  };
-
-  const handleLinkToLiveEvent = async () => {
-    if (!currentSet) return;
-    
-    setLinkingToEvent(true);
-    try {
-      // Refresh the current set to show it's now linked
-      await fetchSet(id);
-      setShowLinkToLiveEventForm(false);
-    } catch (err) {
-      console.error('Failed to link to live event:', err);
-    } finally {
-      setLinkingToEvent(false);
-    }
-  };
 
 
   const formatDuration = (minutes) => {
@@ -518,81 +447,6 @@ const SetDetailsPage = () => {
               </div>
             )}
 
-            {/* Mark as Live and Create Live Event buttons for YouTube/SoundCloud sets */}
-            {(() => {
-              const sourceType = currentSet.source_type?.toLowerCase();
-              const isImportedSet = sourceType !== 'live';
-              const isYouTubeOrSoundCloud = sourceType === 'youtube' || sourceType === 'soundcloud';
-              const isCreator = isAuthenticated && user?.id === currentSet.created_by_id;
-              const canMarkAsLive = isYouTubeOrSoundCloud && isAuthenticated && isCreator;
-              
-              // Show helpful message if user is creator but set can't be marked as live
-              if (isAuthenticated && isCreator && !isYouTubeOrSoundCloud && isImportedSet) {
-                return (
-                  <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-                    <p className="text-sm text-yellow-300">
-                      <strong>Cannot mark as live:</strong> Only YouTube and SoundCloud sets can be converted to live sets.
-                      <br />
-                      Current set type: <strong>{currentSet.source_type || 'unknown'}</strong>
-                    </p>
-                  </div>
-                );
-              }
-              
-              // Show message if user is not the creator
-              if (isAuthenticated && !isCreator && isYouTubeOrSoundCloud) {
-                return (
-                  <div className="mb-6 p-4 bg-surface-700 border border-white/5 rounded-xl">
-                    <p className="text-sm text-slate-400">Only the creator of this set can mark it as live.</p>
-                  </div>
-                );
-              }
-              
-              if (!canMarkAsLive) return null;
-              
-              return (
-                <div className="mb-6 space-y-3">
-                  {/* Mark as Live button */}
-                  <div>
-                    <button
-                      onClick={handleMarkAsLive}
-                      disabled={markingAsLive}
-                      className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {markingAsLive ? 'Marking as Live...' : '🎤 Mark as Live Set'}
-                    </button>
-                    <p className="text-sm text-gray-600 mt-2">
-                      Convert this set to a live set. The original URL will be saved as the recording.
-                    </p>
-                  </div>
-                  
-                  {/* Divider */}
-                  <div className="border-t border-white/5 my-4"></div>
-                  
-                  {/* Create Live Event button */}
-                  {!showCreateLiveEventForm ? (
-                    <div>
-                      <button
-                        onClick={() => setShowCreateLiveEventForm(true)}
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
-                      >
-                        🎪 Create Separate Live Event
-                      </button>
-                      <p className="text-sm text-gray-600 mt-2">
-                        Create a new live event (separate from this set) that you can link sets to.
-                      </p>
-                    </div>
-                  ) : (
-                    <CreateLiveEventForm
-                      set={currentSet}
-                      onSubmit={handleCreateLiveEvent}
-                      onCancel={() => setShowCreateLiveEventForm(false)}
-                      loading={creatingLiveEvent}
-                    />
-                  )}
-                </div>
-              );
-            })()}
 
             {/* Metadata */}
             <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-slate-400">
@@ -633,10 +487,47 @@ const SetDetailsPage = () => {
               </div>
             )}
 
+            {/* Top 5 */}
+            {isAuthenticated && (
+              <div className="mb-4 flex items-center gap-2 flex-wrap">
+                {userLog?.is_top_set ? (
+                  <button
+                    onClick={handleUnsetTopSet}
+                    disabled={settingTopSet}
+                    className="px-3 py-1 rounded-lg text-sm font-medium bg-primary-600/20 text-primary-300 border border-primary-500/30 hover:bg-primary-600/30 disabled:opacity-50 cursor-pointer transition-colors"
+                  >
+                    {settingTopSet ? '...' : `#${userLog.top_set_order} in Top 5 — Remove`}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-500">
+                      {userLog ? 'Add to Top 5:' : 'Top 5:'}
+                    </span>
+                    {userLog ? (
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((order) => (
+                          <button
+                            key={order}
+                            onClick={() => handleSetTopSet(order)}
+                            disabled={settingTopSet}
+                            className="px-2 py-1 rounded-lg text-xs font-medium bg-primary-600 text-white hover:bg-primary-500 disabled:opacity-50 cursor-pointer transition-colors"
+                          >
+                            #{order}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-600">Mark as listened first</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-3">
-              {/* Show "Listen" button for YouTube/SoundCloud sets with valid URLs */}
-              {currentSet.source_url && 
+              {/* Listen button */}
+              {currentSet.source_url &&
                (currentSet.source_url.startsWith('http://') || currentSet.source_url.startsWith('https://')) && (
                 <a
                   href={currentSet.source_url}
@@ -650,97 +541,31 @@ const SetDetailsPage = () => {
                   Listen on {currentSet.source_type === 'youtube' ? 'YouTube' : 'SoundCloud'}
                 </a>
               )}
-              
-              {/* Mark as Seen/Listened button - works for all sets */}
-              {isAuthenticated && (
-                <div className="space-y-3">
-                  {(() => {
-                    const isLiveSet = currentSet.source_type?.toLowerCase() === 'live';
-                    const actionLabel = isLiveSet ? 'Seen' : 'Listened';
-                    const actionIcon = isLiveSet ? '👁️' : '🎧';
-                    
-                    return userLog ? (
-                      <div className="space-y-2">
-                        <button
-                          onClick={handleRemoveFromSeen}
-                          disabled={loggingSet}
-                          className="inline-flex items-center px-4 py-2 bg-accent-500/20 hover:bg-accent-500/30 text-accent-400 font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {loggingSet ? 'Removing...' : `✓ Marked as ${actionLabel}`}
-                        </button>
-                        
-                        {/* Top Set Management */}
-                        <div className="flex items-center space-x-4">
-                          {userLog.is_top_set ? (
-                            <>
-                              <span className="text-primary-600 font-medium text-sm">
-                                ⭐ In Top Sets (#{userLog.top_set_order})
-                              </span>
-                              <button
-                                onClick={handleUnsetTopSet}
-                                disabled={settingTopSet}
-                                className="text-sm text-slate-400 hover:text-slate-200 underline disabled:opacity-50"
-                              >
-                                Remove
-                              </button>
-                              <button
-                                onClick={() => setShowTopSetSelector(!showTopSetSelector)}
-                                disabled={settingTopSet}
-                                className="text-sm text-primary-400 hover:text-primary-300 underline disabled:opacity-50"
-                              >
-                                Change Position
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => setShowTopSetSelector(!showTopSetSelector)}
-                              disabled={settingTopSet}
-                              className="text-sm text-primary-400 hover:text-primary-300 underline disabled:opacity-50"
-                            >
-                              Add to Top Sets
-                            </button>
-                          )}
-                          
-                          {showTopSetSelector && (
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm text-slate-400">Position:</span>
-                              {[1, 2, 3, 4, 5].map((order) => (
-                                <button
-                                  key={order}
-                                  onClick={() => handleSetTopSet(order)}
-                                  disabled={settingTopSet}
-                                  className={`px-3 py-1 text-sm rounded-lg font-medium disabled:opacity-50 transition-colors cursor-pointer ${
-                                    userLog.is_top_set && userLog.top_set_order === order
-                                      ? 'bg-primary-600 text-white'
-                                      : 'bg-surface-700 hover:bg-surface-600 text-slate-300'
-                                  }`}
-                                >
-                                  {order}
-                                </button>
-                              ))}
-                              <button
-                                onClick={() => setShowTopSetSelector(false)}
-                                className="text-sm text-slate-400 hover:text-slate-200 underline cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handleMarkAsSeen}
-                        disabled={loggingSet}
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loggingSet ? 'Marking...' : `${actionIcon} Mark as ${actionLabel}`}
-                      </button>
-                    );
-                  })()}
-                </div>
-              )}
-              
+
+              {/* Mark as Seen/Listened */}
+              {isAuthenticated && (() => {
+                const isLiveSet = currentSet.source_type?.toLowerCase() === 'live';
+                const actionLabel = isLiveSet ? 'Seen' : 'Listened';
+                const actionIcon = isLiveSet ? '👁️' : '🎧';
+                return userLog ? (
+                  <button
+                    onClick={handleRemoveFromSeen}
+                    disabled={loggingSet}
+                    className="inline-flex items-center px-4 py-2 bg-accent-500/20 hover:bg-accent-500/30 text-accent-400 font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {loggingSet ? 'Removing...' : `✓ Marked as ${actionLabel}`}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleMarkAsSeen}
+                    disabled={loggingSet}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loggingSet ? 'Marking...' : `${actionIcon} Mark as ${actionLabel}`}
+                  </button>
+                );
+              })()}
+
               {isAuthenticated && (
                 <button
                   onClick={() => setShowReviewForm(!showReviewForm)}

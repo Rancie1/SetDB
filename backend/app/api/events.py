@@ -365,161 +365,6 @@ async def unlink_set_from_event(
     return event
 
 
-@router.post("/{event_id}/confirm", status_code=status.HTTP_201_CREATED)
-async def confirm_event(
-    event_id: UUID,
-    current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Confirm that you attended a live event.
-    
-    This helps verify that the event actually happened. After a threshold
-    of confirmations (e.g., 3-5 users), the event can be auto-verified.
-    """
-    # Check if event exists
-    result = await db.execute(select(Event).where(Event.id == event_id))
-    event_obj = result.scalar_one_or_none()
-    
-    if not event_obj:
-        raise EventNotFoundError(str(event_id))
-    
-    # Check if user already confirmed
-    existing = await db.execute(
-        select(EventConfirmation).where(
-            EventConfirmation.user_id == current_user.id,
-            EventConfirmation.event_id == event_id
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="You have already confirmed this event"
-        )
-    
-    # Create confirmation
-    confirmation = EventConfirmation(
-        user_id=current_user.id,
-        event_id=event_id
-    )
-    
-    db.add(confirmation)
-    
-    # Update confirmation count
-    event_obj.confirmation_count += 1
-    
-    # Auto-verify after 3 confirmations
-    if event_obj.confirmation_count >= 3:
-        event_obj.is_verified = True
-    
-    await db.commit()
-    await db.refresh(event_obj)
-    
-    return {"message": "Event confirmed", "confirmation_count": event_obj.confirmation_count}
-
-
-@router.delete("/{event_id}/confirm", status_code=status.HTTP_204_NO_CONTENT)
-async def unconfirm_event(
-    event_id: UUID,
-    current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Remove your confirmation from an event."""
-    # Find confirmation
-    result = await db.execute(
-        select(EventConfirmation).where(
-            EventConfirmation.user_id == current_user.id,
-            EventConfirmation.event_id == event_id
-        )
-    )
-    confirmation = result.scalar_one_or_none()
-    
-    if not confirmation:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="You have not confirmed this event"
-        )
-    
-    # Get event to update count
-    result = await db.execute(select(Event).where(Event.id == event_id))
-    event_obj = result.scalar_one_or_none()
-    
-    if not event_obj:
-        raise EventNotFoundError(str(event_id))
-    
-    # Delete confirmation
-    db.delete(confirmation)
-    
-    # Update confirmation count
-    event_obj.confirmation_count = max(0, event_obj.confirmation_count - 1)
-    
-    # Unverify if below threshold
-    if event_obj.confirmation_count < 3:
-        event_obj.is_verified = False
-    
-    await db.commit()
-    await db.flush()
-    
-    return None
-
-
-@router.get("/users/{user_id}/confirmed", response_model=PaginatedResponse)
-async def get_user_confirmed_events(
-    user_id: UUID,
-    page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Get paginated list of events confirmed by a user.
-    
-    Returns all events that the user has confirmed/attended.
-    """
-    # Check if user exists
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID {user_id} not found"
-        )
-    
-    # Build query - get events via EventConfirmation
-    query = (
-        select(Event)
-        .join(EventConfirmation, Event.id == EventConfirmation.event_id)
-        .where(EventConfirmation.user_id == user_id)
-        .order_by(Event.event_date.desc().nulls_last(), Event.created_at.desc())
-    )
-    
-    # Get total count
-    count_query = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
-    
-    # Apply pagination
-    offset = (page - 1) * limit
-    query = query.offset(offset).limit(limit)
-    
-    # Execute query
-    result = await db.execute(query)
-    events = result.scalars().all()
-    
-    # Calculate pages
-    pages = (total + limit - 1) // limit if total > 0 else 0
-    
-    # Convert to response schemas
-    event_responses = [EventResponse.model_validate(event) for event in events]
-    
-    return PaginatedResponse(
-        items=event_responses,
-        total=total,
-        page=page,
-        limit=limit,
-        pages=pages
-    )
-
 
 @router.post("/create-from-set/{set_id}", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 async def create_event_from_set(
@@ -807,3 +652,67 @@ async def import_skiddle_event(
         raise HTTPException(status_code=502, detail=f"Skiddle API error: {str(e)}")
 
     return await _get_or_create_event(db, parsed, current_user)
+
+
+# ── Attendance ────────────────────────────────────────────────────────────────
+
+@router.get("/{event_id}/attended", response_model=dict)
+async def get_attendance(
+    event_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Check whether the current user has marked themselves as attended."""
+    result = await db.execute(
+        select(EventConfirmation).where(
+            EventConfirmation.event_id == event_id,
+            EventConfirmation.user_id == current_user.id,
+        )
+    )
+    attended = result.scalar_one_or_none() is not None
+    return {"attended": attended}
+
+
+@router.post("/{event_id}/attended", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def mark_attended(
+    event_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark the current user as having attended this event."""
+    result = await db.execute(select(Event).where(Event.id == event_id))
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    existing = await db.execute(
+        select(EventConfirmation).where(
+            EventConfirmation.event_id == event_id,
+            EventConfirmation.user_id == current_user.id,
+        )
+    )
+    if existing.scalar_one_or_none():
+        return {"attended": True}
+
+    db.add(EventConfirmation(user_id=current_user.id, event_id=event_id))
+    await db.commit()
+    return {"attended": True}
+
+
+@router.delete("/{event_id}/attended", status_code=status.HTTP_204_NO_CONTENT)
+async def unmark_attended(
+    event_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove the current user's attendance mark for this event."""
+    result = await db.execute(
+        select(EventConfirmation).where(
+            EventConfirmation.event_id == event_id,
+            EventConfirmation.user_id == current_user.id,
+        )
+    )
+    confirmation = result.scalar_one_or_none()
+    if confirmation:
+        await db.delete(confirmation)
+        await db.commit()
