@@ -436,6 +436,34 @@ async def get_artists_batch(artist_ids: List[str]) -> List[Dict]:
         return results
 
 
+async def search_spotify_artist_by_name(name: str) -> Optional[Dict]:
+    """Search Spotify for an artist by name. Returns the best match or None."""
+    access_token = await get_spotify_access_token()
+    if not access_token:
+        return None
+
+    url = "https://api.spotify.com/v1/search"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    params = {"q": name, "type": "artist", "limit": 5}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, headers=headers, timeout=10.0)
+            response.raise_for_status()
+            data = response.json()
+            artists = data.get("artists", {}).get("items", [])
+            if not artists:
+                return None
+            # Prefer exact name match (case-insensitive), fall back to first result
+            for artist in artists:
+                if artist.get("name", "").lower() == name.lower():
+                    return _parse_artist(artist)
+            return _parse_artist(artists[0])
+    except Exception as e:
+        logger.warning(f"Spotify artist search failed for '{name}': {e}")
+        return None
+
+
 async def get_artist_top_tracks(artist_id: str) -> List[Dict]:
     """Get top tracks for a Spotify artist."""
     access_token = await get_spotify_access_token()
@@ -540,6 +568,7 @@ async def resolve_spotify_url(url: str) -> Optional[Dict]:
                 "id": track.get("id"),
                 "title": track.get("name", ""),
                 "artist_name": artist_names,
+                "artist_ids": [a.get("id") for a in artists if a.get("id")],
                 "spotify_url": spotify_url,
                 "thumbnail_url": thumbnail_url,
                 "duration_ms": track.get("duration_ms", 0),

@@ -35,13 +35,6 @@ const SetCard = ({ set }) => {
     }
   };
 
-  const getSetTypeBadge = (set) => {
-    if (set.source_type?.toLowerCase() === 'live') {
-      return { label: 'Live Set', className: 'bg-violet-500/20 text-violet-300 border border-violet-500/30' };
-    }
-    return { label: 'Upload', className: 'bg-white/5 text-slate-400 border border-white/10' };
-  };
-
   const getPublishDate = (set) => {
     if (set.source_type?.toLowerCase() === 'youtube' && set.extra_metadata?.published_at) {
       return new Date(set.extra_metadata.published_at);
@@ -57,7 +50,6 @@ const SetCard = ({ set }) => {
 
   const detailUrl = `/sets/${set.id}`;
   const sourceBadge = getSourceBadge(set.source_type);
-  const typeBadge = getSetTypeBadge(set);
 
   return (
     <Link
@@ -111,9 +103,6 @@ const SetCard = ({ set }) => {
 
         {/* Badges */}
         <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${typeBadge.className}`}>
-            {typeBadge.label}
-          </span>
           <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${sourceBadge.className}`}>
             {sourceBadge.label}
           </span>
@@ -128,15 +117,6 @@ const SetCard = ({ set }) => {
         <p className="text-xs text-slate-400 mb-3">
           <ArtistLink name={set.dj_name} />
         </p>
-
-        {set.source_type?.toLowerCase() === 'live' && set.recording_url && (
-          <div className="mb-2 flex items-center gap-1.5">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-violet-400">
-              <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
-            </svg>
-            <p className="text-xs text-violet-400 font-medium">Has Recording</p>
-          </div>
-        )}
 
         <div className="flex items-center justify-between text-xs text-slate-500">
           {formatDuration(set.duration_minutes) && (

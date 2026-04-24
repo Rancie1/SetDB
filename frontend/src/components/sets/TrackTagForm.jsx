@@ -142,6 +142,7 @@ const TrackTagForm = ({ setId, onSubmit, onCancel, setHasRecording = false }) =>
           spotify_track_id: selectedTrack.platform === 'spotify' && selectedTrack.id ? selectedTrack.id : null,
           thumbnail_url: selectedTrack.thumbnail_url || null,
           duration_ms: selectedTrack.duration_ms || null,
+          spotify_artist_ids: selectedTrack.platform === 'spotify' && selectedTrack.artist_ids?.length ? selectedTrack.artist_ids : null,
         };
 
         const createResponse = await standaloneTracksService.createTrack(trackData);

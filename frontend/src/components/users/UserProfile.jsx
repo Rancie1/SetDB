@@ -10,12 +10,12 @@ import useAuthStore from '../../store/authStore';
 import * as usersService from '../../services/usersService';
 import * as logsService from '../../services/logsService';
 import * as eventsService from '../../services/eventsService';
+import * as reviewsService from '../../services/reviewsService';
 import UserStats from './UserStats';
 import SetCard from '../sets/SetCard';
 import TopSets from './TopSets';
 import TopTracks from './TopTracks';
 import TopEvents from './TopEvents';
-import TopVenues from './TopVenues';
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -27,13 +27,7 @@ const UserProfile = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followingLoading, setFollowingLoading] = useState(false);
   
-  // Live sets seen
-  const [liveSetsSeen, setLiveSetsSeen] = useState([]);
-  const [liveSetsLoading, setLiveSetsLoading] = useState(false);
-  const [liveSetsPage, setLiveSetsPage] = useState(1);
-  const [liveSetsTotal, setLiveSetsTotal] = useState(0);
-  
-  // Listened sets (non-live)
+  // Listened sets (all)
   const [listenedSets, setListenedSets] = useState([]);
   const [listenedSetsLoading, setListenedSetsLoading] = useState(false);
   const [listenedSetsPage, setListenedSetsPage] = useState(1);
@@ -44,6 +38,11 @@ const UserProfile = () => {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsPage, setEventsPage] = useState(1);
   const [eventsTotal, setEventsTotal] = useState(0);
+
+  // Reviews
+  const [userReviews, setUserReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsTotal, setReviewsTotal] = useState(0);
 
   // Top sets
   const [topSets, setTopSets] = useState([]);
@@ -60,12 +59,12 @@ const UserProfile = () => {
   }, [id, currentUser]);
 
   useEffect(() => {
-    if (activeTab === 'live-sets' && id) {
-      loadLiveSetsSeen();
-    } else if (activeTab === 'listened' && id) {
+    if (activeTab === 'listened' && id) {
       loadListenedSets();
     } else if (activeTab === 'events' && id) {
       loadEventsAttended();
+    } else if (activeTab === 'reviews' && id) {
+      loadUserReviews();
     }
   }, [activeTab, id]);
 
@@ -133,51 +132,17 @@ const UserProfile = () => {
     }
   };
 
-  const loadLiveSetsSeen = async (page = 1) => {
-    setLiveSetsLoading(true);
-    try {
-      const response = await logsService.getUserLogs(id, page, 20, 'live');
-      const logs = response.data.items || [];
-      // Extract the set from each log (the API now includes set in the response)
-      const sets = logs.map(log => log.set).filter(Boolean);
-      setLiveSetsSeen(sets);
-      setLiveSetsPage(page);
-      setLiveSetsTotal(response.data.total || 0);
-    } catch (error) {
-      console.error('Failed to load live sets seen:', error);
-      setLiveSetsSeen([]);
-    } finally {
-      setLiveSetsLoading(false);
-    }
-  };
-
   const loadListenedSets = async (page = 1) => {
     setListenedSetsLoading(true);
     try {
-      // Get YouTube and SoundCloud sets separately, then combine
-      const [youtubeResponse, soundcloudResponse] = await Promise.all([
-        logsService.getUserLogs(id, 1, 100, 'youtube').catch(() => ({ data: { items: [] } })),
-        logsService.getUserLogs(id, 1, 100, 'soundcloud').catch(() => ({ data: { items: [] } }))
-      ]);
-      
-      const youtubeLogs = youtubeResponse.data.items || [];
-      const soundcloudLogs = soundcloudResponse.data.items || [];
-      
-      // Combine and extract sets
-      const allLogs = [...youtubeLogs, ...soundcloudLogs];
-      const sets = allLogs.map(log => log.set).filter(Boolean);
-      
-      // Apply pagination on frontend
-      const limit = 20;
-      const offset = (page - 1) * limit;
-      const paginatedSets = sets.slice(offset, offset + limit);
-      
-      setListenedSets(paginatedSets);
+      const response = await logsService.getUserLogs(id, page, 20);
+      const logs = response.data.items || [];
+      const sets = logs.map(log => log.set).filter(Boolean);
+      setListenedSets(sets);
       setListenedSetsPage(page);
-      setListenedSetsTotal(sets.length);
+      setListenedSetsTotal(response.data.total || 0);
     } catch (error) {
       console.error('Failed to load listened sets:', error);
-      console.error('Error details:', error.response?.data);
       setListenedSets([]);
     } finally {
       setListenedSetsLoading(false);
@@ -196,6 +161,20 @@ const UserProfile = () => {
       setEventsAttended([]);
     } finally {
       setEventsLoading(false);
+    }
+  };
+
+  const loadUserReviews = async (page = 1) => {
+    setReviewsLoading(true);
+    try {
+      const response = await reviewsService.getUserReviews(id, page, 20);
+      setUserReviews(response.data.items || []);
+      setReviewsTotal(response.data.total || 0);
+    } catch (error) {
+      console.error('Failed to load reviews:', error);
+      setUserReviews([]);
+    } finally {
+      setReviewsLoading(false);
     }
   };
 
@@ -303,18 +282,12 @@ const UserProfile = () => {
         <TopEvents userId={id} isOwnProfile={isOwnProfile} />
       </div>
 
-      {/* Top Venues */}
-      <div className="mb-6">
-        <TopVenues userId={id} isOwnProfile={isOwnProfile} />
-      </div>
-
       {/* Tabs */}
       <div className="bg-surface-800 rounded-xl border border-white/5">
         <div className="border-b border-white/5">
           <nav className="flex gap-1 px-4 pt-2" aria-label="Tabs">
             {[
-              { id: 'listened', label: 'Listened Sets' },
-              { id: 'live-sets', label: 'Live Sets Seen' },
+              { id: 'listened', label: 'Sets' },
               { id: 'events', label: 'Events Attended' },
               { id: 'reviews', label: 'Reviews' },
               { id: 'stats', label: 'Statistics' },
@@ -345,7 +318,7 @@ const UserProfile = () => {
           {activeTab === 'listened' && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-100">Listened Sets</h3>
+                <h3 className="text-lg font-semibold text-slate-100">Sets</h3>
                 {listenedSetsTotal > 0 && (
                   <p className="text-sm text-slate-400">
                     {listenedSets.length} of {listenedSetsTotal}
@@ -366,34 +339,6 @@ const UserProfile = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {listenedSets.map((set) => (
-                    <SetCard key={set.id} set={set} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          {activeTab === 'live-sets' && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-100">Live Sets Seen</h3>
-                {liveSetsTotal > 0 && (
-                  <p className="text-sm text-slate-400">{liveSetsSeen.length} of {liveSetsTotal}</p>
-                )}
-              </div>
-              {liveSetsLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-64"></div>
-                  ))}
-                </div>
-              ) : liveSetsSeen.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-slate-400 text-lg mb-2">No live sets seen yet</p>
-                  <p className="text-slate-500 text-sm">Live sets you mark as seen will appear here</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {liveSetsSeen.map((set) => (
                     <SetCard key={set.id} set={set} />
                   ))}
                 </div>
@@ -465,7 +410,58 @@ const UserProfile = () => {
           )}
           {activeTab === 'reviews' && (
             <div>
-              <p className="text-slate-400">Reviews will appear here...</p>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-100">Reviews</h3>
+                {reviewsTotal > 0 && <p className="text-sm text-slate-400">{reviewsTotal} reviews</p>}
+              </div>
+              {reviewsLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => <div key={i} className="bg-surface-700 animate-pulse rounded-xl h-32"></div>)}
+                </div>
+              ) : userReviews.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-slate-400 text-lg mb-2">No reviews yet</p>
+                  <p className="text-slate-500 text-sm">Reviews written will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {userReviews.map((review) => (
+                    <div key={review.id} className="bg-surface-800 rounded-xl border border-white/5 p-5">
+                      {review.set && (
+                        <Link
+                          to={`/sets/${review.set.id}`}
+                          className="flex items-center gap-3 mb-3 group"
+                        >
+                          {review.set.thumbnail_url && (
+                            <img src={review.set.thumbnail_url} alt={review.set.title}
+                              className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-200 group-hover:text-primary-400 transition-colors truncate text-sm">
+                              {review.set.title}
+                            </p>
+                            <p className="text-xs text-slate-500 truncate">{review.set.dj_name}</p>
+                          </div>
+                          {review.user_rating && (
+                            <span className="ml-auto flex-shrink-0 px-2 py-0.5 bg-accent-500/20 border border-accent-500/30 rounded-md text-accent-400 text-sm font-semibold">
+                              {review.user_rating.toFixed(1)}
+                            </span>
+                          )}
+                        </Link>
+                      )}
+                      {review.contains_spoilers && (
+                        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 mb-2">
+                          <p className="text-yellow-400 text-xs font-medium">Contains Spoilers</p>
+                        </div>
+                      )}
+                      <p className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">{review.content}</p>
+                      <p className="text-xs text-slate-600 mt-2">
+                        {new Date(review.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -253,6 +253,44 @@ async def delete_review(
     
     await db.delete(review)
     await db.commit()
-    
+
     return None
+
+
+@router.get("/users/{user_id}", response_model=PaginatedResponse)
+async def get_user_reviews(
+    user_id: UUID,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all public reviews written by a user, newest first."""
+    query = (
+        select(Review)
+        .where(Review.user_id == user_id, Review.is_public == True)
+        .order_by(Review.created_at.desc())
+    )
+
+    total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
+
+    reviews = (await db.execute(query.offset((page - 1) * limit).limit(limit))).scalars().all()
+
+    items = []
+    for review in reviews:
+        await db.refresh(review, ["user", "set"])
+        rating_result = await db.execute(
+            select(Rating).where(Rating.user_id == review.user_id, Rating.set_id == review.set_id)
+        )
+        rating = rating_result.scalar_one_or_none()
+        review_dict = ReviewResponse.model_validate(review).model_dump()
+        review_dict["user_rating"] = rating.rating if rating else None
+        review_dict["set"] = (
+            {"id": str(review.set.id), "title": review.set.title,
+             "dj_name": review.set.dj_name, "thumbnail_url": review.set.thumbnail_url}
+            if review.set else None
+        )
+        items.append(review_dict)
+
+    pages = (total + limit - 1) // limit if total > 0 else 0
+    return PaginatedResponse(items=items, total=total, page=page, limit=limit, pages=pages)
 

@@ -163,7 +163,6 @@ const SetsPage = () => {
             {isDb && set.duration_minutes > 0 && <span>{formatDurationMinutes(set.duration_minutes)}</span>}
             {!isDb && set.duration_ms > 0 && <span>{formatDuration(set.duration_ms)}</span>}
             {!isDb && set.playback_count > 0 && <span>{set.playback_count.toLocaleString()} plays</span>}
-            {set.source_type === 'live' && set.recording_url && <span className="text-violet-400">Has Recording</span>}
           </div>
         </div>
       </div>

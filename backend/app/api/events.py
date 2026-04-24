@@ -716,3 +716,30 @@ async def unmark_attended(
     if confirmation:
         await db.delete(confirmation)
         await db.commit()
+
+
+@router.get("/users/{user_id}/confirmed", response_model=PaginatedResponse)
+async def get_user_confirmed_events(
+    user_id: UUID,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all events a user has marked as attended, newest first."""
+    query = (
+        select(Event)
+        .join(EventConfirmation, Event.id == EventConfirmation.event_id)
+        .where(EventConfirmation.user_id == user_id)
+        .order_by(EventConfirmation.created_at.desc())
+    )
+
+    total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
+
+    events = (await db.execute(query.offset((page - 1) * limit).limit(limit))).scalars().all()
+
+    from app.schemas import EventResponse
+    pages = (total + limit - 1) // limit if total > 0 else 0
+    return PaginatedResponse(
+        items=[EventResponse.model_validate(e).model_dump() for e in events],
+        total=total, page=page, limit=limit, pages=pages
+    )

@@ -192,16 +192,6 @@ async def create_set(
             detail=f"Invalid source_type: {set_data.source_type}"
         )
     
-    # For live sets, they start as unverified
-    is_live_set = source_type_enum == SourceType.LIVE
-    
-    # Validate recording_url - only live sets can have recording URLs
-    if set_data.recording_url and source_type_enum != SourceType.LIVE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="recording_url can only be set for live sets"
-        )
-    
     # Create new set
     new_set = DJSet(
         title=set_data.title,
@@ -216,8 +206,7 @@ async def create_set(
         venue_location=set_data.venue_location,
         recording_url=set_data.recording_url,
         created_by_id=current_user.id,
-        # Live sets start as unverified
-        is_verified=False if is_live_set else True,  # YouTube/SoundCloud are auto-verified
+        is_verified=True,
         confirmation_count=0
     )
     
@@ -264,12 +253,6 @@ async def update_set(
     if set_update.venue_location is not None:
         set_obj.venue_location = set_update.venue_location
     if set_update.recording_url is not None:
-        # Only allow recording_url for live sets
-        if set_update.recording_url and set_obj.source_type != SourceType.LIVE:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="recording_url can only be set for live sets"
-            )
         set_obj.recording_url = set_update.recording_url
     
     await db.commit()

@@ -45,6 +45,12 @@ const SetDetailsPage = () => {
   const [trackTagsLoading, setTrackTagsLoading] = useState(false);
   const [showTrackTagForm, setShowTrackTagForm] = useState(false);
   const [settingTopSet, setSettingTopSet] = useState(false);
+  const [showLinkEventForm, setShowLinkEventForm] = useState(false);
+  const [eventSearchQuery, setEventSearchQuery] = useState('');
+  const [eventResults, setEventResults] = useState([]);
+  const [eventSearching, setEventSearching] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState(null);
+  const [linkingEvent, setLinkingEvent] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -183,15 +189,11 @@ const SetDetailsPage = () => {
       }
     } catch (err) {
       console.error('Failed to mark set:', err);
-      const isLiveSet = currentSet?.source_type?.toLowerCase() === 'live';
-      const actionLabel = isLiveSet ? 'seen' : 'listened';
-      
       if (err.response?.status === 409) {
-        // If already logged, reload to get the existing log
         await loadUserLog();
-        alert(`You have already marked this set as ${actionLabel}`);
+        alert('You have already marked this set as listened');
       } else {
-        alert(err.response?.data?.detail || `Failed to mark set as ${actionLabel}`);
+        alert(err.response?.data?.detail || 'Failed to mark set as listened');
       }
     } finally {
       setLoggingSet(false);
@@ -201,24 +203,15 @@ const SetDetailsPage = () => {
   const handleRemoveFromSeen = async () => {
     if (!userLog || !currentSet) return;
 
-    const isLiveSet = currentSet.source_type?.toLowerCase() === 'live';
-    const actionLabel = isLiveSet ? 'seen' : 'listened';
-    const confirmMessage = `Remove this set from your ${actionLabel} list?`;
-
-    if (!confirm(confirmMessage)) {
-      return;
-    }
+    if (!confirm('Remove this set from your listened list?')) return;
 
     setLoggingSet(true);
     try {
       await logsService.deleteLog(userLog.id);
-      // Immediately update the state
       setUserLog(null);
     } catch (err) {
       console.error('Failed to remove log:', err);
-      const isLiveSet = currentSet?.source_type?.toLowerCase() === 'live';
-      const actionLabel = isLiveSet ? 'seen' : 'listened';
-      alert(err.response?.data?.detail || `Failed to remove from ${actionLabel} list`);
+      alert(err.response?.data?.detail || 'Failed to remove from listened list');
     } finally {
       setLoggingSet(false);
     }
@@ -234,6 +227,47 @@ const SetDetailsPage = () => {
       setTrackTags([]);
     } finally {
       setTrackTagsLoading(false);
+    }
+  };
+
+  const loadEvents = async (query = '') => {
+    setEventSearching(true);
+    try {
+      const res = await eventsService.getEvents(query ? { search: query } : {}, 1, 20);
+      setEventResults(res.data.items || []);
+    } catch (err) {
+      console.error('Failed to load events:', err);
+      setEventResults([]);
+    } finally {
+      setEventSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showLinkEventForm) return;
+    const timeoutId = setTimeout(() => loadEvents(eventSearchQuery), 300);
+    return () => clearTimeout(timeoutId);
+  }, [eventSearchQuery, showLinkEventForm]);
+
+  const handleOpenLinkEventForm = () => {
+    setShowLinkEventForm(true);
+    loadEvents('');
+  };
+
+  const handleLinkToEvent = async () => {
+    if (!selectedEventId) return;
+    setLinkingEvent(true);
+    try {
+      await eventsService.linkSetToEvent(selectedEventId, id);
+      setShowLinkEventForm(false);
+      setSelectedEventId(null);
+      setEventSearchQuery('');
+      setEventResults([]);
+    } catch (err) {
+      console.error('Failed to link to event:', err);
+      alert(err.response?.data?.detail || 'Failed to link set to event');
+    } finally {
+      setLinkingEvent(false);
     }
   };
 
@@ -325,12 +359,6 @@ const SetDetailsPage = () => {
     }
   };
 
-  const getSetTypeLabel = (set) => set.source_type?.toLowerCase() === 'live' ? 'Live Set' : 'Upload';
-
-  const getSetTypeColor = (set) => {
-    if (set.source_type?.toLowerCase() === 'live') return 'bg-violet-500/20 text-violet-300 border border-violet-500/30';
-    return 'bg-white/5 text-slate-400 border border-white/10';
-  };
 
   if (loading) {
     return (
@@ -407,14 +435,6 @@ const SetDetailsPage = () => {
                 </div>
               )}
               <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
-                {/* Set type badge */}
-                {/* Set type badge */}
-                <span
-                  className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium border ${getSetTypeColor(currentSet)}`}
-                >
-                  {getSetTypeLabel(currentSet)}
-                </span>
-                {/* Source platform badge */}
                 <span
                   className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium ${getSourceColor(
                     currentSet.source_type
@@ -436,12 +456,11 @@ const SetDetailsPage = () => {
               <ArtistLink name={currentSet.dj_name} />
             </p>
 
-            {/* Live set with recording indicator */}
-            {currentSet.source_type?.toLowerCase() === 'live' && currentSet.recording_url && (
-              <div className="mb-4 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
-                <p className="text-sm font-medium text-violet-300 mb-1">Recording available</p>
+            {/* Recording link */}
+            {currentSet.recording_url && (
+              <div className="mb-4 p-3 rounded-xl bg-surface-700 border border-white/10">
                 <a href={currentSet.recording_url} target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-violet-400 hover:text-violet-300 underline">
+                  className="text-sm text-primary-400 hover:text-primary-300 underline">
                   Listen to recording →
                 </a>
               </div>
@@ -542,29 +561,24 @@ const SetDetailsPage = () => {
                 </a>
               )}
 
-              {/* Mark as Seen/Listened */}
-              {isAuthenticated && (() => {
-                const isLiveSet = currentSet.source_type?.toLowerCase() === 'live';
-                const actionLabel = isLiveSet ? 'Seen' : 'Listened';
-                const actionIcon = isLiveSet ? '👁️' : '🎧';
-                return userLog ? (
-                  <button
-                    onClick={handleRemoveFromSeen}
-                    disabled={loggingSet}
-                    className="inline-flex items-center px-4 py-2 bg-accent-500/20 hover:bg-accent-500/30 text-accent-400 font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {loggingSet ? 'Removing...' : `✓ Marked as ${actionLabel}`}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleMarkAsSeen}
-                    disabled={loggingSet}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loggingSet ? 'Marking...' : `${actionIcon} Mark as ${actionLabel}`}
-                  </button>
-                );
-              })()}
+              {/* Mark as Listened */}
+              {isAuthenticated && (userLog ? (
+                <button
+                  onClick={handleRemoveFromSeen}
+                  disabled={loggingSet}
+                  className="inline-flex items-center px-4 py-2 bg-accent-500/20 hover:bg-accent-500/30 text-accent-400 font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loggingSet ? 'Removing...' : '✓ Marked as Listened'}
+                </button>
+              ) : (
+                <button
+                  onClick={handleMarkAsSeen}
+                  disabled={loggingSet}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loggingSet ? 'Marking...' : '🎧 Mark as Listened'}
+                </button>
+              ))}
 
               {isAuthenticated && (
                 <button
@@ -572,6 +586,15 @@ const SetDetailsPage = () => {
                   className="inline-flex items-center px-4 py-2 bg-surface-700 hover:bg-surface-600 text-slate-300 font-medium rounded-lg transition-colors cursor-pointer"
                 >
                   {userReview ? 'Edit Review' : 'Write Review'}
+                </button>
+              )}
+
+              {isAuthenticated && (
+                <button
+                  onClick={handleOpenLinkEventForm}
+                  className="inline-flex items-center px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white font-medium rounded-xl transition-colors cursor-pointer"
+                >
+                  Link to Event
                 </button>
               )}
             </div>
@@ -582,6 +605,87 @@ const SetDetailsPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
+          {/* Link to Event Form */}
+          {showLinkEventForm && isAuthenticated && (
+            <div className="bg-surface-800 rounded-xl border border-white/5 p-6">
+              <h3 className="text-lg font-semibold text-slate-100 mb-1">Link Set to Event</h3>
+              <p className="text-sm text-slate-500 mb-4">Select an event from the database to link this set to.</p>
+
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={eventSearchQuery}
+                  onChange={(e) => setEventSearchQuery(e.target.value)}
+                  placeholder="Search events by name, venue..."
+                  className="w-full px-3 py-2 bg-surface-700 border border-white/10 text-slate-100 placeholder-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                />
+
+                {eventSearching && (
+                  <div className="text-sm text-slate-500">Loading events...</div>
+                )}
+
+                {eventResults.length > 0 && (
+                  <div className="bg-surface-700 border border-white/10 rounded-lg max-h-72 overflow-y-auto">
+                    {eventResults.map((event) => (
+                      <div
+                        key={event.id}
+                        onClick={() => setSelectedEventId(event.id)}
+                        className={`flex items-center gap-3 p-3 border-b border-white/5 last:border-b-0 cursor-pointer transition-colors ${
+                          selectedEventId === event.id ? 'bg-violet-600/20' : 'hover:bg-surface-600'
+                        }`}
+                      >
+                        {event.thumbnail_url && (
+                          <img
+                            src={event.thumbnail_url}
+                            alt={event.event_name || event.title}
+                            className="w-10 h-10 object-cover rounded flex-shrink-0"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-slate-200 truncate">{event.event_name || event.title}</div>
+                          <div className="text-xs text-slate-500">
+                            {event.event_date ? new Date(event.event_date).toLocaleDateString() : ''}
+                            {event.venue_location ? ` • ${event.venue_location}` : ''}
+                          </div>
+                        </div>
+                        {selectedEventId === event.id && (
+                          <span className="text-violet-400 text-sm flex-shrink-0">✓</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {!eventSearching && eventResults.length === 0 && (
+                  <div className="text-sm text-slate-500">No events found. Try searching by name or venue.</div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={handleLinkToEvent}
+                    disabled={!selectedEventId || linkingEvent}
+                    className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-surface-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors cursor-pointer"
+                  >
+                    {linkingEvent ? 'Linking...' : 'Link to Selected Event'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowLinkEventForm(false);
+                      setSelectedEventId(null);
+                      setEventSearchQuery('');
+                      setEventResults([]);
+                    }}
+                    disabled={linkingEvent}
+                    className="px-4 py-2 bg-surface-700 hover:bg-surface-600 text-slate-300 font-medium rounded-xl border border-white/5 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Rating Section */}
           <RatingDisplay
             setId={id}

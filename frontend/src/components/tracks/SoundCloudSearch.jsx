@@ -77,6 +77,7 @@ const SoundCloudSearch = () => {
         spotify_track_id: track.platform === 'spotify' && track.id ? track.id : null,
         thumbnail_url: track.thumbnail_url || null,
         duration_ms: track.duration_ms || null,
+        spotify_artist_ids: track.platform === 'spotify' && track.artist_ids?.length ? track.artist_ids : null,
       };
       
       const response = await standaloneTracksService.createTrack(trackData);

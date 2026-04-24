@@ -63,14 +63,44 @@ async def get_artist_by_name(
     name: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Look up an artist by name. Returns 404 if not found."""
+    """Look up an artist by name. If not in DB, attempts to import from Spotify."""
     result = await db.execute(
         select(Artist).where(func.lower(Artist.name) == name.lower())
     )
     artist = result.scalar_one_or_none()
-    if not artist:
+    if artist:
+        return ArtistResponse.model_validate(artist)
+
+    # Not in DB — try to import from Spotify
+    from app.services.spotify_search import search_spotify_artist_by_name
+    spotify_artist = await search_spotify_artist_by_name(name)
+    if not spotify_artist or not spotify_artist.get("spotify_artist_id"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artist not found")
-    return ArtistResponse.model_validate(artist)
+
+    # Create the artist row
+    new_artist = Artist(
+        name=spotify_artist["name"],
+        spotify_artist_id=spotify_artist["spotify_artist_id"],
+        spotify_url=spotify_artist.get("spotify_url"),
+        image_url=spotify_artist.get("image_url"),
+        genres=spotify_artist.get("genres"),
+    )
+    db.add(new_artist)
+    try:
+        await db.commit()
+        await db.refresh(new_artist)
+    except Exception:
+        await db.rollback()
+        # Race condition — another request may have just created it; retry the lookup
+        result = await db.execute(
+            select(Artist).where(func.lower(Artist.name) == name.lower())
+        )
+        artist = result.scalar_one_or_none()
+        if not artist:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artist not found")
+        return ArtistResponse.model_validate(artist)
+
+    return ArtistResponse.model_validate(new_artist)
 
 
 @router.get("/{artist_id}", response_model=ArtistDetailResponse)

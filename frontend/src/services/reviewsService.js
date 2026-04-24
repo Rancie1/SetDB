@@ -6,6 +6,10 @@
 
 import api from './api';
 
+export const getUserReviews = async (userId, page = 1, limit = 20) => {
+  return api.get(`/reviews/users/${userId}`, { params: { page, limit } });
+};
+
 export const getSetReviews = async (setId, page = 1, limit = 20) => {
   return api.get(`/reviews/sets/${setId}`, {
     params: { page, limit }
